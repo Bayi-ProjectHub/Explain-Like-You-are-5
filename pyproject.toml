@@ -1,0 +1,7 @@
+[project]
+name = "explain-like-you-are-5"
+version = "0.1.0"
+description = "This project aims to improve user's self learning ability and language organisation & presentation skills"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
