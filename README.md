@@ -7,6 +7,23 @@ In this process, while expanding and deepening users' knowledge, it would effect
 
 ## Devloping
 
-- 安装 uv 环境管理器 (ask GPT)
-- 在该项目的终端中运行 `uv sync`
-- 开始开发吧!!
+具体开发请查看 docs/DEVELOPMENT.md
+
+### 初次 clone
+1. 安装 uv 环境管理器 (ask GPT)，之后运行所有代码都通过 uv
+2. 在该项目的终端中运行 `uv sync` 拉取 dependencies
+3. 开始开发吧!!
+
+### 修改与提交
+- 切换到你的工作分支，或新建一个分支
+    ```bash 
+    git switch video # 切换至已存在的分支
+    git switch -c my-new-branch # 新建分支
+    ```
+
+- 更改后，在本地测试后，提交：
+    ```bash
+    git add .
+    git commit -m "简短描述改动了什么"
+    git push # 如果是新分支，git push -u origin my-new-branch
+    ```

@@ -4,4 +4,11 @@ version = "0.1.0"
 description = "This project aims to improve user's self learning ability and language organisation & presentation skills"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.162.0",
+    "numpy>=2.5.4",
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+default = true
