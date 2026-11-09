@@ -7,7 +7,7 @@ In this process, while expanding and deepening users' knowledge, it would effect
 
 ## Devloping
 
-具体开发请查看 docs/DEVELOPMENT.md
+具体开发请查看 ~docs/DEVELOPMENT.md~ AGENTS.md
 
 ### 初次 clone
 1. 安装 uv 环境管理器 (ask GPT)，之后运行所有代码都通过 uv
