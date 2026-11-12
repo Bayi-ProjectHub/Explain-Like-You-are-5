@@ -28,12 +28,21 @@ In this process, while expanding and deepening users' knowledge, it would effect
     git push # 如果是新分支，git push -u origin my-new-branch
     ```
 
-## 音频转写接口（已实现）
+## 启动与使用
+
+### 启动服务
+
+```bash
+cp .env.example .env # 仅第一次启动执行即可
+uv run uvicorn src.serve:app --reload --env-file .env --port 8000
+```
+
+### 音频转写接口
 
 音频模块位于 `src/audio/`，采用异步任务：上传后立即返回任务 id，之后轮询结果。
 
 ```bash
-# 1. 上传音频。language 可选（zh、en 等），不传则自动识别
+# 1. 上传音频进行处理。language 可选（zh、en 等），不传则自动识别
 curl -s -F "file=@demo.wav" -F "language=zh" http://127.0.0.1:8000/audio/transcriptions
 # {"task_id": "...", "status": "queued", "created_at": "...", "result": null}
 
