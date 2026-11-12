@@ -65,6 +65,7 @@ class FasterWhisperTranscriber:
             language=language,
             vad_filter=True,
         )
+        raw_segments = list(segment_iter)
         segments = [
             Segment(
                 id=index,
@@ -72,10 +73,11 @@ class FasterWhisperTranscriber:
                 end=round(segment.end, 2),
                 text=segment.text.strip(),
             )
-            for index, segment in enumerate(segment_iter)
+            for index, segment in enumerate(raw_segments)
         ]
-        # whisper 的每个分句通常以空格开头，直接拼接后再 strip 最接近自然文本
-        text = "".join(segment.text for segment in segments).strip()
+        # 英文分句文本通常以空格开头，拼接原始文本（不要先 strip）再整体 strip，
+        # 否则会丢掉分句之间的空格，出现 "have.As" 这类粘连。
+        text = "".join(segment.text for segment in raw_segments).strip()
         return TranscriptionResult(
             text=text,
             language=info.language,
