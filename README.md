@@ -27,3 +27,20 @@ In this process, while expanding and deepening users' knowledge, it would effect
     git commit -m "简短描述改动了什么"
     git push # 如果是新分支，git push -u origin my-new-branch
     ```
+
+## 音频转写接口（已实现）
+
+音频模块位于 `src/audio/`，采用异步任务：上传后立即返回任务 id，之后轮询结果。
+
+```bash
+# 1. 上传音频。language 可选（zh、en 等），不传则自动识别
+curl -s -F "file=@demo.wav" -F "language=zh" http://127.0.0.1:8000/audio/transcriptions
+# {"task_id": "...", "status": "queued", "created_at": "...", "result": null}
+
+# 2. 轮询任务
+curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
+# status: queued | processing | completed | failed
+# completed 时 result 包含 text、language、duration 和带起止时间的 segments
+```
+
+运行参数在 `src/config.py` 中，通过环境变量配置（`ELY5_WHISPER_MODEL` 默认 `small`、`ELY5_WHISPER_DEVICE`、`ELY5_WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。

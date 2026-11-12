@@ -5,8 +5,22 @@ description = "This project aims to improve user's self learning ability and lan
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "av>=11,<19",  # faster-whisper 1.2.1 仍调用 av.open(metadata_errors=...)，av 19 移除了该参数
     "fastapi[standard]>=0.162.0",
+    "faster-whisper>=1.2.0,<2",
     "numpy>=2.5.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: 需要真实模型与网络的端到端测试（设置 ELY5_RUN_INTEGRATION=1 才运行）",
 ]
 
 [[tool.uv.index]]
