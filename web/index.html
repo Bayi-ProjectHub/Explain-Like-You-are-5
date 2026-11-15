@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#f5f4ee" />
+    <title>讲解师 · 把新知识，讲成自己的话</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232e654e'/%3E%3Ctext x='20' y='28' text-anchor='middle' font-size='27' fill='white'%3Ee%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/app/styles.css" />
+    <script type="module" src="/app/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/app/"
+        ><span class="brand-icon">e<span>5</span></span
+        ><span>讲解师<small>EXPLAIN LIKE YOU’RE 5</small></span></a
+      >
+      <div class="header-right">
+        <span class="edition" data-i18n="edition">一点好奇，一次讲解。</span
+        ><button
+          id="ui-language"
+          class="language-button"
+          type="button"
+          aria-label="Switch interface language"
+        >
+          EN ↗
+        </button>
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="eyebrow" data-i18n="yourPractice">
+          YOUR PRACTICE / 你的练习
+        </div>
+        <nav aria-label="练习步骤">
+          <ol class="steps">
+            <li data-step="topic">
+              <span class="step-number">01</span>
+              <div>
+                <strong data-i18n="stepTopic">遇见一个新概念</strong
+                ><small data-i18n="stepTopicSub">从好奇开始</small>
+              </div>
+            </li>
+            <li data-step="prepare">
+              <span class="step-number">02</span>
+              <div>
+                <strong data-i18n="stepPrepare">想明白，再开口</strong
+                ><small data-i18n="stepPrepareSub">研究、理解、组织</small>
+              </div>
+            </li>
+            <li data-step="upload">
+              <span class="step-number">03</span>
+              <div>
+                <strong data-i18n="stepUpload">用自己的话讲</strong
+                ><small data-i18n="stepUploadSub">上传你的讲解视频</small>
+              </div>
+            </li>
+            <li data-step="result">
+              <span class="step-number">04</span>
+              <div>
+                <strong data-i18n="stepResult">回看这次表达</strong
+                ><small data-i18n="stepResultSub">看见自己的进步</small>
+              </div>
+            </li>
+          </ol>
+        </nav>
+        <div class="sidebar-note">
+          <span class="note-mark">“</span>
+          <p data-i18n="sidebarQuote">
+            如果能把一个概念<br />讲得简单，<br />理解就更近了一步。
+          </p>
+          <span class="note-line"></span
+          ><small data-i18n="sidebarNote">不用完美。先讲一次。</small>
+        </div>
+        <div class="sidebar-footer">
+          <span class="status-dot"></span
+          ><span data-i18n="localPractice">一次专注的学习练习</span>
+        </div>
+      </aside>
+      <main id="main" tabindex="-1">
+        <div id="notice" class="notice" role="alert" hidden></div>
+        <section id="topic-panel" class="panel" aria-labelledby="topic-heading">
+          <div class="page-kicker">
+            <span class="tiny-line"></span
+            ><span data-i18n="topicKicker">从一个问题开始</span
+            ><span class="page-count">01 / 04</span>
+          </div>
+          <h1 id="topic-heading" data-i18n="topicHeading">
+            把新知识，<br /><em>讲成自己的话。</em>
+          </h1>
+          <p class="lead" data-i18n="topicLead">
+            抽一个概念，给自己一点研究时间。然后，试着向一个初次听说它的人讲明白。
+          </p>
+          <div class="filters">
+            <label
+              ><span data-i18n="field">探索领域</span
+              ><select id="category">
+                <option value="" data-i18n="allFields">全部领域</option>
+              </select></label
+            >
+            <label
+              ><span data-i18n="difficulty">挑战难度</span
+              ><select id="difficulty">
+                <option value="" data-i18n="allLevels">随意探索</option>
+                <option value="starter" data-i18n="starter">
+                  入门 · 生活里的知识
+                </option>
+                <option value="intermediate" data-i18n="intermediate">
+                  进阶 · 多想一步
+                </option>
+                <option value="advanced" data-i18n="advanced">
+                  挑战 · 解释复杂概念
+                </option>
+              </select></label
+            >
+            <fieldset class="speaking-language">
+              <legend data-i18n="speakingLanguage">讲解语言</legend>
+              <div class="segmented">
+                <label
+                  ><input
+                    type="radio"
+                    name="speaking-language"
+                    value="zh"
+                    checked
+                  /><span>中文</span></label
+                ><label
+                  ><input
+                    type="radio"
+                    name="speaking-language"
+                    value="en"
+                  /><span>English</span></label
+                >
+              </div>
+            </fieldset>
+          </div>
+          <article class="term-card">
+            <div class="card-top">
+              <span class="pill" id="term-category">—</span
+              ><span id="term-level" class="subtle"></span>
+            </div>
+            <div class="term-content">
+              <div class="term-overline" data-i18n="yourConcept">
+                这次，试着讲清楚
+              </div>
+              <h2 id="term-title">…</h2>
+              <p id="term-translation" class="translation"></p>
+              <p id="term-prompt" class="term-prompt"></p>
+            </div>
+            <div class="card-bottom">
+              <div class="term-times">
+                <span id="prep-time"></span><span class="divider">/</span
+                ><span id="speak-time"></span>
+              </div>
+              <button id="redraw" class="text-button" type="button">
+                <span aria-hidden="true">⤨</span>
+                <span data-i18n="redraw">换一个概念</span>
+              </button>
+            </div>
+            <div class="card-decoration" aria-hidden="true">
+              a<span>ha!</span>
+            </div>
+          </article>
+          <div class="actions">
+            <p class="quiet" id="catalog-count"></p>
+            <button id="start-prepare" class="primary" type="button" disabled>
+              <span data-i18n="startPreparing">就讲这个，开始准备</span
+              ><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+          <div class="small-principle">
+            <span aria-hidden="true">✳</span>
+            <p data-i18n="principle">
+              不必背出定义。一个贴切的例子，比一串陌生的术语更有力量。
+            </p>
+          </div>
+        </section>
+
+        <section
+          id="prepare-panel"
+          class="panel"
+          aria-labelledby="prepare-heading"
+          hidden
+        >
+          <div class="page-kicker">
+            <span class="tiny-line"></span
+            ><span data-i18n="prepareKicker">给理解一点时间</span
+            ><span class="page-count">02 / 04</span>
+          </div>
+          <h1 id="prepare-heading" data-i18n="prepareHeading">
+            先弄明白，<br /><em>再说给别人听。</em>
+          </h1>
+          <p class="lead">
+            <span data-i18n="thisConcept">这次的概念：</span
+            ><strong id="prepare-term"></strong>
+          </p>
+          <div class="preparation-grid">
+            <article class="timer-card">
+              <span class="eyebrow" data-i18n="prepRemaining">准备时间</span>
+              <div id="timer" class="timer" role="timer">05:00</div>
+              <p id="timer-message" class="quiet" data-i18n="timerHelp">
+                查资料、想例子，也留一点时间理清顺序。
+              </p>
+              <button
+                id="toggle-timer"
+                class="secondary"
+                type="button"
+                data-i18n="pause"
+              >
+                暂停计时
+              </button>
+            </article>
+            <article class="thinking-card">
+              <h2 data-i18n="thinkAbout">带着这三个问题研究</h2>
+              <ol>
+                <li data-i18n="question1">它到底在说什么？</li>
+                <li data-i18n="question2">生活里，有什么贴切的例子？</li>
+                <li data-i18n="question3">最容易被误解的地方是什么？</li>
+              </ol>
+              <p id="prepare-prompt" class="quiet"></p>
+            </article>
+          </div>
+          <label class="notes-label" for="notes" data-i18n="notesLabel"
+            >留几个关键词，帮自己理清思路</label
+          ><textarea
+            id="notes"
+            rows="3"
+            maxlength="5000"
+            placeholder="一个例子、一个关键区别、一句话结论……"
+          ></textarea>
+          <p class="quiet small" data-i18n="notesHint">
+            笔记仅保存在当前浏览器会话，不参与评价。
+          </p>
+          <div class="actions">
+            <button
+              id="back-topic"
+              class="text-button"
+              type="button"
+              data-i18n="backTopic"
+            >
+              ← 重新选题</button
+            ><button id="ready-upload" class="primary" type="button">
+              <span data-i18n="readyUpload">准备好了，去上传</span
+              ><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </section>
+
+        <section
+          id="upload-panel"
+          class="panel"
+          aria-labelledby="upload-heading"
+          hidden
+        >
+          <div class="page-kicker">
+            <span class="tiny-line"></span
+            ><span data-i18n="uploadKicker">把理解变成表达</span
+            ><span class="page-count">03 / 04</span>
+          </div>
+          <h1 id="upload-heading" data-i18n="uploadHeading">
+            镜头前，<br /><em>讲一遍你的理解。</em>
+          </h1>
+          <p class="lead" id="upload-instruction"></p>
+          <div id="upload-controls">
+            <label id="drop-zone" class="drop-zone" for="video-file"
+              ><input
+                id="video-file"
+                type="file"
+                accept=".mp4,.mov,.webm,.mkv,.m4v,video/*" /><span
+                class="upload-icon"
+                aria-hidden="true"
+                >↑</span
+              ><strong data-i18n="chooseVideo">选择或拖入讲解视频</strong
+              ><span class="quiet" id="file-limits"></span
+            ></label>
+            <div id="file-preview" class="file-preview" hidden>
+              <video
+                id="video-preview"
+                controls
+                playsinline
+                preload="metadata"
+              ></video>
+              <div class="file-info">
+                <strong id="file-name"></strong
+                ><span id="file-size" class="quiet"></span
+                ><button
+                  id="remove-video"
+                  class="text-button"
+                  type="button"
+                  data-i18n="removeVideo"
+                >
+                  移除，重新选择
+                </button>
+              </div>
+            </div>
+            <p class="quiet upload-tip" data-i18n="uploadTip">
+              找一个安静的地方，确认人声清楚。视频在处理结束后会从服务器删除。
+            </p>
+          </div>
+          <article id="processing" class="processing" aria-live="polite" hidden>
+            <div class="processing-top">
+              <span class="spinner" aria-hidden="true"></span>
+              <h2 id="processing-heading"></h2>
+              <span class="quiet" id="elapsed"></span>
+            </div>
+            <p id="processing-description" class="quiet"></p>
+            <progress id="upload-progress" max="100" value="0"></progress>
+            <ol class="processing-stages">
+              <li data-processing="uploading" data-i18n="uploadStage">
+                上传视频
+              </li>
+              <li data-processing="extracting" data-i18n="extractStage">
+                读取音轨
+              </li>
+              <li data-processing="transcribing" data-i18n="transcribeStage">
+                转写讲解
+              </li>
+            </ol>
+            <div id="reconnect-controls" hidden>
+              <button
+                id="reconnect"
+                class="secondary"
+                type="button"
+                data-i18n="reconnect"
+              >
+                继续查看处理结果</button
+              ><button
+                id="new-after-error"
+                class="text-button"
+                type="button"
+                data-i18n="newPractice"
+              >
+                开始新练习
+              </button>
+            </div>
+          </article>
+          <div class="actions" id="upload-actions">
+            <button
+              id="back-prepare"
+              class="text-button"
+              type="button"
+              data-i18n="backPrepare"
+            >
+              ← 回到准备</button
+            ><button id="submit-video" class="primary" type="button" disabled>
+              <span data-i18n="submitVideo">提交这次讲解</span
+              ><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </section>
+
+        <section
+          id="result-panel"
+          class="panel"
+          aria-labelledby="result-heading"
+          hidden
+        >
+          <div class="page-kicker">
+            <span class="tiny-line"></span
+            ><span data-i18n="resultKicker">留下一次理解的痕迹</span
+            ><span class="page-count">04 / 04</span>
+          </div>
+          <h1 id="result-heading" data-i18n="resultHeading">
+            你的讲解，<br /><em>值得再听一遍。</em>
+          </h1>
+          <p class="lead" id="result-summary"></p>
+          <div class="result-status">
+            <span class="status-dot"></span
+            ><span data-i18n="transcriptionDone">语音转写已完成</span
+            ><span class="quiet" id="result-duration"></span>
+          </div>
+          <div class="result-tabs" role="tablist" aria-label="转写视图">
+            <button
+              id="full-tab"
+              class="active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="full-text"
+              type="button"
+              data-i18n="fullText"
+            >
+              完整讲解</button
+            ><button
+              id="segments-tab"
+              tabindex="-1"
+              role="tab"
+              aria-selected="false"
+              aria-controls="segments"
+              type="button"
+              data-i18n="segments"
+            >
+              分段回看
+            </button>
+          </div>
+          <article class="transcript-card">
+            <div
+              id="full-text"
+              class="transcript"
+              role="tabpanel"
+              aria-labelledby="full-tab"
+            ></div>
+            <div
+              id="segments"
+              role="tabpanel"
+              aria-labelledby="segments-tab"
+              hidden
+            ></div>
+          </article>
+          <div id="evaluation-modules" class="evaluation-modules"></div>
+          <p class="quiet small" data-i18n="transcriptCaution">
+            转写可能包含识别错误。当前结果展示语音文本，尚未生成内容或表现评价。
+          </p>
+          <div class="actions">
+            <button
+              id="download-result"
+              class="text-button"
+              type="button"
+              data-i18n="downloadResult"
+            >
+              ↓ 保存这次结果</button
+            ><button id="practice-again" class="primary" type="button">
+              <span data-i18n="practiceAgain">再探索一个概念</span
+              ><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </section>
+        <footer class="page-footer">
+          <span>EXPLAIN LIKE YOU’RE 5</span
+          ><span data-i18n="footer">让每一次表达，都成为一次学习。</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

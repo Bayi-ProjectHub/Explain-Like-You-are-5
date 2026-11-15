@@ -2,11 +2,16 @@ from contextlib import asynccontextmanager
 import logging
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from .audio.engine import FasterWhisperTranscriber
 from .audio.router import router as audio_router
 from .audio.service import TranscriptionService
-from .config import load_settings
+from .config import PROJECT_ROOT, load_settings
+from .practice.router import router as practice_router
+from .practice.service import PracticeService
+from .practice.vocabulary import load_vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +30,11 @@ async def lifespan(app: FastAPI):
         upload_dir=settings.upload_dir,
         max_upload_mb=settings.max_upload_mb,
     )
+    load_vocabulary()  # 启动时验证词库，错误尽早暴露。
+    app.state.practice_service = PracticeService(
+        app.state.transcription_service, settings.upload_dir / "practice",
+        settings.max_upload_mb, settings.max_video_seconds,
+    )
     logger.info("音频转写模块就绪（模型 %s）", settings.whisper_model)
     yield
 
@@ -37,6 +47,13 @@ app = FastAPI(
 )
 
 app.include_router(audio_router)
+app.include_router(practice_router)
+app.mount("/app", StaticFiles(directory=PROJECT_ROOT / "web", html=True), name="product")
+
+
+@app.get("/app", include_in_schema=False)
+async def product():
+    return RedirectResponse("/app/")
 
 
 @app.get("/")

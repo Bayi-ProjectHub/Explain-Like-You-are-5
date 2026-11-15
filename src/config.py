@@ -32,6 +32,8 @@ class Settings:
     upload_dir: Path
     # 单次上传大小上限（MB）
     max_upload_mb: int
+    # 用户端视频的音轨时长上限，默认 10 分钟
+    max_video_seconds: int = 600
 
 
 def load_settings() -> Settings:
@@ -41,4 +43,5 @@ def load_settings() -> Settings:
         whisper_compute_type=_env("ELY5_WHISPER_COMPUTE_TYPE", "int8"),
         upload_dir=Path(_env("ELY5_UPLOAD_DIR", str(PROJECT_ROOT / "data" / "uploads"))),
         max_upload_mb=int(_env("ELY5_MAX_UPLOAD_MB", "200")),
+        max_video_seconds=int(_env("ELY5_MAX_VIDEO_SECONDS", "600")),
     )
