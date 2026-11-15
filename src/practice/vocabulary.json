@@ -1,0 +1,571 @@
+{
+  "version": 1,
+  "categories": {
+    "science": {
+      "zh": "自然科学",
+      "en": "Science"
+    },
+    "technology": {
+      "zh": "技术与 AI",
+      "en": "Technology & AI"
+    },
+    "thinking": {
+      "zh": "思维与学习",
+      "en": "Thinking & learning"
+    },
+    "society": {
+      "zh": "经济与社会",
+      "en": "Economics & society"
+    },
+    "everyday": {
+      "zh": "生活与设计",
+      "en": "Everyday design"
+    },
+    "mathematics": {
+      "zh": "数学与数据",
+      "en": "Math & data"
+    }
+  },
+  "terms": [
+    {
+      "id": "gravity",
+      "category": "science",
+      "difficulty": "starter",
+      "title": {
+        "zh": "重力",
+        "en": "Gravity"
+      },
+      "prompt": {
+        "zh": "为什么跳起来以后会落回地面？试着用一个日常场景来讲。",
+        "en": "Why do you come back down after a jump? Explain with an everyday example."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "evaporation",
+      "category": "science",
+      "difficulty": "starter",
+      "title": {
+        "zh": "蒸发",
+        "en": "Evaporation"
+      },
+      "prompt": {
+        "zh": "晾着的衣服为什么会变干？它和把水烧开一样吗？",
+        "en": "Why do wet clothes dry? Is that the same as boiling water?"
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "photosynthesis",
+      "category": "science",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "光合作用",
+        "en": "Photosynthesis"
+      },
+      "prompt": {
+        "zh": "一棵树怎样利用阳光？从它需要什么、产生什么开始讲。",
+        "en": "How does a tree use sunlight? Start with what it needs and what it produces."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "natural-selection",
+      "category": "science",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "自然选择",
+        "en": "Natural selection"
+      },
+      "prompt": {
+        "zh": "同一种动物为什么会出现不同的特征？用一个例子讲清变化怎样积累。",
+        "en": "Why do animals of one species have different traits? Show how changes can accumulate."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "entropy",
+      "category": "science",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "熵",
+        "en": "Entropy"
+      },
+      "prompt": {
+        "zh": "从一个具体过程出发，解释熵与能量分散的关系，并说说比喻的局限。",
+        "en": "Use a concrete process to explain entropy and energy dispersal, including the limits of your analogy."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "superposition",
+      "category": "science",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "量子叠加",
+        "en": "Quantum superposition"
+      },
+      "prompt": {
+        "zh": "怎样向初学者介绍量子叠加？注意区分量子状态与普通的未知结果。",
+        "en": "Introduce quantum superposition to a beginner. Distinguish a quantum state from an ordinary unknown outcome."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "algorithm",
+      "category": "technology",
+      "difficulty": "starter",
+      "title": {
+        "zh": "算法",
+        "en": "Algorithm"
+      },
+      "prompt": {
+        "zh": "用一个生活里的分步骤任务解释算法，再说说为什么步骤顺序重要。",
+        "en": "Explain an algorithm through a step-by-step everyday task. Why does the order matter?"
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "cloud-computing",
+      "category": "technology",
+      "difficulty": "starter",
+      "title": {
+        "zh": "云计算",
+        "en": "Cloud computing"
+      },
+      "prompt": {
+        "zh": "照片存在云端意味着什么？试着解释设备、网络和远程电脑的关系。",
+        "en": "What does it mean to store photos in the cloud? Explain devices, networks, and remote computers."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "machine-learning",
+      "category": "technology",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "机器学习",
+        "en": "Machine learning"
+      },
+      "prompt": {
+        "zh": "电脑如何从例子中学会做判断？区分训练时和使用时发生的事。",
+        "en": "How can a computer learn to make judgments from examples? Distinguish training from use."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "encryption",
+      "category": "technology",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "加密",
+        "en": "Encryption"
+      },
+      "prompt": {
+        "zh": "一条消息怎样只让指定的人看懂？用一个比喻解释钥匙的作用。",
+        "en": "How can a message be readable only by the intended person? Use an analogy for the role of a key."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "overfitting",
+      "category": "technology",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "过拟合",
+        "en": "Overfitting"
+      },
+      "prompt": {
+        "zh": "为什么练习题全对，遇到新题却可能出错？说明这个比喻怎样对应模型。",
+        "en": "Why might perfect practice results fail to carry over to new questions? Connect the analogy to a model."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "reward-hacking",
+      "category": "technology",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "奖励黑客",
+        "en": "Reward hacking"
+      },
+      "prompt": {
+        "zh": "当奖励和真实目标不完全一致时会发生什么？给一个例子并提出改进思路。",
+        "en": "What happens when a reward differs from the real goal? Give an example and suggest an improvement."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "active-recall",
+      "category": "thinking",
+      "difficulty": "starter",
+      "title": {
+        "zh": "主动回忆",
+        "en": "Active recall"
+      },
+      "prompt": {
+        "zh": "合上书自己想答案，与反复阅读有什么区别？用一次学习经历解释。",
+        "en": "How is recalling an answer with the book closed different from rereading? Use a learning experience."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "analogy",
+      "category": "thinking",
+      "difficulty": "starter",
+      "title": {
+        "zh": "类比",
+        "en": "Analogy"
+      },
+      "prompt": {
+        "zh": "怎样用熟悉的事物讲清陌生的概念？也说说你的比喻在哪里不成立。",
+        "en": "How can something familiar explain an unfamiliar concept? Say where your analogy breaks down."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "confirmation-bias",
+      "category": "thinking",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "确认偏误",
+        "en": "Confirmation bias"
+      },
+      "prompt": {
+        "zh": "人为什么容易只看到支持自己想法的信息？给出一个生活例子。",
+        "en": "Why do people tend to notice information that supports their beliefs? Give an everyday example."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "spaced-repetition",
+      "category": "thinking",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "间隔重复",
+        "en": "Spaced repetition"
+      },
+      "prompt": {
+        "zh": "把复习分散到多天有什么意义？向同学解释怎样安排一次尝试。",
+        "en": "Why spread revision across several days? Explain how a classmate could try it."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "first-principles",
+      "category": "thinking",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "第一性原理",
+        "en": "First principles"
+      },
+      "prompt": {
+        "zh": "遇到一个问题时，怎样从基本事实重新推理？用具体问题展示过程。",
+        "en": "How can you reason about a problem from basic facts? Demonstrate with a concrete problem."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "cognitive-load",
+      "category": "thinking",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "认知负荷",
+        "en": "Cognitive load"
+      },
+      "prompt": {
+        "zh": "为什么同一页内容有时很难理解？从信息安排和已有知识两个角度解释。",
+        "en": "Why can one page be hard to understand? Discuss both information design and prior knowledge."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "supply-demand",
+      "category": "society",
+      "difficulty": "starter",
+      "title": {
+        "zh": "供给与需求",
+        "en": "Supply and demand"
+      },
+      "prompt": {
+        "zh": "一种水果突然很抢手，价格为什么可能变化？把其他条件也交代清楚。",
+        "en": "Why might a fruit become more expensive when demand rises? Explain the other conditions too."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "division-of-labor",
+      "category": "society",
+      "difficulty": "starter",
+      "title": {
+        "zh": "分工",
+        "en": "Division of labor"
+      },
+      "prompt": {
+        "zh": "几个人一起做一件事，怎样分工可能更有效？说说分工也会带来什么成本。",
+        "en": "How could a group divide a task effectively? Explain a cost of dividing the work too."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "opportunity-cost",
+      "category": "society",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "机会成本",
+        "en": "Opportunity cost"
+      },
+      "prompt": {
+        "zh": "选择一件事时，你放弃了什么？用一个真实可理解的选择来解释。",
+        "en": "What do you give up when choosing one option? Explain with a relatable choice."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "externality",
+      "category": "society",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "外部性",
+        "en": "Externality"
+      },
+      "prompt": {
+        "zh": "一个人的决定怎样影响没有参与决定的人？分别想想好处和坏处。",
+        "en": "How can a decision affect people who did not make it? Consider both benefits and harms."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "goodharts-law",
+      "category": "society",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "古德哈特定律",
+        "en": "Goodhart’s law"
+      },
+      "prompt": {
+        "zh": "当指标变成目标时，为什么可能失去衡量作用？用例子区分指标和真实目标。",
+        "en": "Why can a measure stop being useful when it becomes a target? Distinguish the measure from the real goal."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "prisoners-dilemma",
+      "category": "society",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "囚徒困境",
+        "en": "Prisoner’s dilemma"
+      },
+      "prompt": {
+        "zh": "为什么各自看起来合理的选择，合在一起却不理想？说明例子的选择与后果。",
+        "en": "Why can individually reasonable choices lead to a poor shared outcome? Explain choices and consequences."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "feedback",
+      "category": "everyday",
+      "difficulty": "starter",
+      "title": {
+        "zh": "反馈",
+        "en": "Feedback"
+      },
+      "prompt": {
+        "zh": "空调怎样知道何时降温？用这个过程解释反馈。",
+        "en": "How does an air conditioner know when to cool? Use that process to explain feedback."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "recycling",
+      "category": "everyday",
+      "difficulty": "starter",
+      "title": {
+        "zh": "回收利用",
+        "en": "Recycling"
+      },
+      "prompt": {
+        "zh": "一个用过的瓶子怎样获得第二次用途？说说回收与重复使用的区别。",
+        "en": "How can a used bottle get a second life? Distinguish recycling from reuse."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "affordance",
+      "category": "everyday",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "可供性",
+        "en": "Affordance"
+      },
+      "prompt": {
+        "zh": "为什么有些门把手让人想拉，有些让人想推？解释形状怎样暗示用法。",
+        "en": "Why do some handles invite pulling and others pushing? Explain how shape suggests use."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "accessibility",
+      "category": "everyday",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "无障碍设计",
+        "en": "Accessibility"
+      },
+      "prompt": {
+        "zh": "同一个界面怎样让更多人用得了？从一个具体使用障碍开始讲。",
+        "en": "How can one interface work for more people? Start with a concrete barrier."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "systems-thinking",
+      "category": "everyday",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "系统思维",
+        "en": "Systems thinking"
+      },
+      "prompt": {
+        "zh": "为什么只解决眼前的一个问题，可能引出另一个问题？画出或讲出因果联系。",
+        "en": "Why might solving one immediate problem create another? Trace the causal connections."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "marginal-benefit",
+      "category": "everyday",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "边际收益递减",
+        "en": "Diminishing marginal benefit"
+      },
+      "prompt": {
+        "zh": "多投入一小时为什么不一定带来同样多的收获？说明例子成立的条件。",
+        "en": "Why might one more hour bring a smaller benefit? Explain the conditions for your example."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "average",
+      "category": "mathematics",
+      "difficulty": "starter",
+      "title": {
+        "zh": "平均数",
+        "en": "Arithmetic mean"
+      },
+      "prompt": {
+        "zh": "怎样用一个数概括一组数？举例说明平均数也可能掩盖差异。",
+        "en": "How can one number summarize a set? Show how an average can hide differences."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "probability",
+      "category": "mathematics",
+      "difficulty": "starter",
+      "title": {
+        "zh": "概率",
+        "en": "Probability"
+      },
+      "prompt": {
+        "zh": "明天有一定概率下雨是什么意思？解释概率与一次具体结果的区别。",
+        "en": "What does a chance of rain mean? Distinguish probability from one actual outcome."
+      },
+      "preparation_seconds": 180,
+      "speaking_seconds": 60
+    },
+    {
+      "id": "correlation-causation",
+      "category": "mathematics",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "相关与因果",
+        "en": "Correlation and causation"
+      },
+      "prompt": {
+        "zh": "两件事一起变化，能说明一件导致另一件吗？用例子解释其他可能性。",
+        "en": "If two things change together, does one cause the other? Explain alternative possibilities."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "sampling-bias",
+      "category": "mathematics",
+      "difficulty": "intermediate",
+      "title": {
+        "zh": "抽样偏差",
+        "en": "Sampling bias"
+      },
+      "prompt": {
+        "zh": "只问身边的同学，能代表所有人的看法吗？说明选人方式怎样影响结论。",
+        "en": "Can asking only nearby classmates represent everyone? Explain how selection changes a conclusion."
+      },
+      "preparation_seconds": 300,
+      "speaking_seconds": 90
+    },
+    {
+      "id": "bayes-rule",
+      "category": "mathematics",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "贝叶斯定理",
+        "en": "Bayes’ theorem"
+      },
+      "prompt": {
+        "zh": "得到一条新线索后，怎样更新原来的判断？用简单数字或场景来讲。",
+        "en": "How should a new clue update an earlier belief? Use simple numbers or a concrete scenario."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    },
+    {
+      "id": "exponential-growth",
+      "category": "mathematics",
+      "difficulty": "advanced",
+      "title": {
+        "zh": "指数增长",
+        "en": "Exponential growth"
+      },
+      "prompt": {
+        "zh": "每次增加同样多，与每次翻倍有什么区别？说明这种增长何时会受限制。",
+        "en": "How does adding the same amount differ from doubling each time? Explain limits to such growth."
+      },
+      "preparation_seconds": 480,
+      "speaking_seconds": 120
+    }
+  ]
+}
