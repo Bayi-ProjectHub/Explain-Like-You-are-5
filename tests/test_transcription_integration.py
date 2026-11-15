@@ -1,7 +1,7 @@
 """集成测试：用真实 faster-whisper 模型转写一段公共音频。
 
-默认跳过（需要下载模型，首次运行较慢）。需要真实模型时设置 ELY5_RUN_INTEGRATION=1 再运行：
-    ELY5_RUN_INTEGRATION=1 uv run pytest -m integration -v
+默认跳过（需要下载模型，首次运行较慢）。需要真实模型时设置 RUN_INTEGRATION=1 再运行：
+    RUN_INTEGRATION=1 uv run pytest -m integration -v
 模型从 huggingface_hub 下载，网络受限时设置 HF_ENDPOINT 指向镜像。
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 from src.audio.engine import FasterWhisperTranscriber
 
-# conftest.py 依据这个标记在未设置 ELY5_RUN_INTEGRATION=1 时跳过本文件
+# conftest.py 依据这个标记在未设置 RUN_INTEGRATION=1 时跳过本文件
 pytestmark = pytest.mark.integration
 
 # OpenAI whisper 仓库里的公共测试音频，内容是一段英文演讲
@@ -30,7 +30,7 @@ def sample_audio(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def test_transcribe_real_audio(sample_audio: Path) -> None:
-    model_size = os.environ.get("ELY5_WHISPER_MODEL", "tiny")
+    model_size = os.environ.get("WHISPER_MODEL", "tiny")
     transcriber = FasterWhisperTranscriber(model_size, "cpu", "int8")
 
     result = transcriber.transcribe(sample_audio, language="en")

@@ -8,9 +8,9 @@ import pytest
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if os.environ.get("ELY5_RUN_INTEGRATION") == "1":
+    if os.environ.get("RUN_INTEGRATION") == "1":
         return
-    skip_integration = pytest.mark.skip(reason="集成测试需真实模型与网络，设置 ELY5_RUN_INTEGRATION=1 才运行")
+    skip_integration = pytest.mark.skip(reason="集成测试需真实模型与网络，设置 RUN_INTEGRATION=1 才运行")
     for item in items:
         if "integration" in item.keywords:
             item.add_marker(skip_integration)

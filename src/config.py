@@ -38,10 +38,10 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        whisper_model=_env("ELY5_WHISPER_MODEL", "small"),
-        whisper_device=_env("ELY5_WHISPER_DEVICE", "cpu"),
-        whisper_compute_type=_env("ELY5_WHISPER_COMPUTE_TYPE", "int8"),
-        upload_dir=Path(_env("ELY5_UPLOAD_DIR", str(PROJECT_ROOT / "data" / "uploads"))),
-        max_upload_mb=int(_env("ELY5_MAX_UPLOAD_MB", "200")),
-        max_video_seconds=int(_env("ELY5_MAX_VIDEO_SECONDS", "600")),
+        whisper_model=_env("WHISPER_MODEL", "small"),
+        whisper_device=_env("WHISPER_DEVICE", "cpu"),
+        whisper_compute_type=_env("WHISPER_COMPUTE_TYPE", "int8"),
+        upload_dir=Path(_env("UPLOAD_DIR", str(PROJECT_ROOT / "data" / "uploads"))),
+        max_upload_mb=int(_env("MAX_UPLOAD_MB", "200")),
+        max_video_seconds=int(_env("MAX_VIDEO_SECONDS", "600")),
     )

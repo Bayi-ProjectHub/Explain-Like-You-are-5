@@ -76,8 +76,8 @@ def make_video(*, with_audio=True, with_video=True) -> bytes:
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("ELY5_UPLOAD_DIR", str(tmp_path))
-    monkeypatch.setenv("ELY5_MAX_UPLOAD_MB", "1")
+    monkeypatch.setenv("UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setenv("MAX_UPLOAD_MB", "1")
     with TestClient(app) as client:
         engine = RecordingTranscriber()
         audio = TranscriptionService(engine, tmp_path / "audio", 1)
