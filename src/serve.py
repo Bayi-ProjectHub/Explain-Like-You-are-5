@@ -1,3 +1,4 @@
+
 from contextlib import asynccontextmanager
 import logging
 
@@ -6,6 +7,7 @@ from fastapi import FastAPI
 from .audio.engine import FasterWhisperTranscriber
 from .audio.router import router as audio_router
 from .audio.service import TranscriptionService
+from .evaluation.router import router as evaluation_router
 from .config import load_settings
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,7 @@ app = FastAPI(
 )
 
 app.include_router(audio_router)
+app.include_router(evaluation_router)
 
 
 @app.get("/")
