@@ -7,10 +7,8 @@ In this process, while expanding and deepening users' knowledge, it would effect
 
 ## Devloping
 
-具体开发请查看 ~docs/DEVELOPMENT.md~ AGENTS.md
-
 ### 初次 clone
-1. 安装 uv 环境管理器 (ask GPT)，之后运行所有代码都通过 uv
+1. 安装 uv 环境管理器 (ask GPT)，之后运行所有代码都通过 uv 环境
 2. 在该项目的终端中运行 `uv sync` 拉取 dependencies
 3. 开始开发吧!!
 
@@ -52,7 +50,7 @@ curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
 # completed 时 result 包含 text、language、duration 和带起止时间的 segments
 ```
 
-运行参数在 `src/config.py` 中，通过环境变量配置（`ELY5_WHISPER_MODEL` 默认 `small`、`ELY5_WHISPER_DEVICE`、`ELY5_WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。
+运行参数在 `src/config.py` 中，通过环境变量配置（`WHISPER_MODEL` 默认 `small`、`WHISPER_DEVICE`、`WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。
 
 ### 文本评测接口
 

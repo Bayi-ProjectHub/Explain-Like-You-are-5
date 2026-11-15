@@ -19,7 +19,7 @@ class TextEvaluator:
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
         self.model = model or os.getenv(
-            "ELY5_EVALUATION_MODEL", "deepseek-flash"
+            "EVALUATION_MODEL", "deepseek-flash"
         )
 
     def evaluate(

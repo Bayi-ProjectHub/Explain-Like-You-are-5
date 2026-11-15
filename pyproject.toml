@@ -21,7 +21,7 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
-    "integration: 需要真实模型与网络的端到端测试（设置 ELY5_RUN_INTEGRATION=1 才运行）",
+    "integration: 需要真实模型与网络的端到端测试（设置 RUN_INTEGRATION=1 才运行）",
 ]
 
 [[tool.uv.index]]

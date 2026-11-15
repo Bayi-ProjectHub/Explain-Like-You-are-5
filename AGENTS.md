@@ -24,11 +24,11 @@ Implemented in `src/audio/`:
   - `POST /audio/transcriptions`：multipart 上传，字段 `file`、可选 `language`；立即返回 `202` 和 `task_id`。
   - `GET /audio/transcriptions/{task_id}`：轮询状态 `queued | processing | completed | failed`；完成后 `result` 为整段文本加带秒级起止时间的分句。
 
-- 配置在 `src/config.py`，全部来自环境变量：`ELY5_WHISPER_MODEL`（默认 `small`）、`ELY5_WHISPER_DEVICE`（默认 `cpu`）、`ELY5_WHISPER_COMPUTE_TYPE`（默认 `int8`）、`ELY5_UPLOAD_DIR`、`ELY5_MAX_UPLOAD_MB`（默认 `200`）。模型从 huggingface_hub 下载，网络受限时可用 `HF_ENDPOINT` 指定镜像。
+- 配置在 `src/config.py`，全部来自环境变量：`WHISPER_MODEL`（默认 `small`）、`WHISPER_DEVICE`（默认 `cpu`）、`WHISPER_COMPUTE_TYPE`（默认 `int8`）、`UPLOAD_DIR`、`MAX_UPLOAD_MB`（默认 `200`）。模型从 huggingface_hub 下载，网络受限时可用 `HF_ENDPOINT` 指定镜像。
 
 已知限制：任务状态存在进程内存里（单进程，服务重启丢任务）；上传的音频转写完成后即删除，不保留。
 
-测试：`uv run pytest`（单元测试用假引擎，不下载模型）；真实模型集成测试用 `ELY5_RUN_INTEGRATION=1 uv run pytest -m integration`。
+测试：`uv run pytest`（单元测试用假引擎，不下载模型）；真实模型集成测试用 `RUN_INTEGRATION=1 uv run pytest -m integration`。
 
 ## Text Evaluation Module
 
