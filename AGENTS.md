@@ -30,6 +30,19 @@ Implemented in `src/audio/`:
 
 测试：`uv run pytest`（单元测试用假引擎，不下载模型）；真实模型集成测试用 `ELY5_RUN_INTEGRATION=1 uv run pytest -m integration`。
 
+## Text Evaluation Module
+
+Implemented in `src/evaluation/`:
+
+- `schemas.py` — 评测结果模型：`knowledge`（accuracy / completeness / logic / depth / examples）与 `speaking`（clarity / coherence / conciseness / organization）九个维度，每维是 `DimensionResult`（score 0–100、rationale、evidence 原文引用、suggestions），另含 `overall_score`、`knowledge_score`、`speaking_score`。`extra="forbid"`，字段不容增减。
+- `prompts.py` — 系统提示词与 `build_user_prompt(...)`。评分权重写在提示词里（knowledge 70%、speaking 30%），模型必须按权重算总分。
+- `evaluator.py` — `TextEvaluator.evaluate(topic=..., transcript=..., language=..., audience=..., key_points=..., reference_notes=...) -> EvaluationResult`。通过 OpenAI SDK 调用 DeepSeek（`https://api.deepseek.com`），用 Pydantic JSON Schema 约束返回结构，再做一次 `model_validate` 校验。
+- `router.py` — 同步接口 `POST /evaluations`：请求体包含 `topic`、`transcript`（必填），可选 `language`（`zh` / `en`，默认 `zh`）、`audience`、`key_points`、`reference_notes`；直接返回完整评测结果。上游限流返回 429，连接/上游错误返回 502，缺少 API key 返回 503。
+
+已知限制：只做文本评测，无法判断发音、语调、语速、表情等纯音频/视频信号；分数是 LLM 估计而非客观事实，`evidence` 暂未校验是否真的是转写原文子串；请求同步执行（超时 120 秒），不做排队；无鉴权与用量配额。
+
+测试：`uv run pytest`；`tests/test_evaluation_schemas.py` 只测数据模型，不调用付费 API。
+
 ## Engineering
 1. Keep It Simple — Prefer straightforward implementations over unnecessary abstractions or complex architectures.
 2. Be pragmatic

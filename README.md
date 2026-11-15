@@ -53,3 +53,22 @@ curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
 ```
 
 运行参数在 `src/config.py` 中，通过环境变量配置（`ELY5_WHISPER_MODEL` 默认 `small`、`ELY5_WHISPER_DEVICE`、`ELY5_WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。
+
+### 文本评测接口
+
+文本模块位于 `src/evaluation/`，调用 DeepSeek 对讲解转录进行评测。需先在 `.env` 配置 `DEEPSEEK_API_KEY`。
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/evaluations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "",
+    "transcript": "这里放讲解的整段文本",
+    "language": "",
+    "audience": "初学者",
+    "key_points": ["解释核心概念", "给一个例子", ...],
+    "reference_notes": ""
+  }'
+```
+
+返回 `knowledge`（准确、完整、逻辑、深度、例子）与 `speaking`（清晰、连贯、简洁、结构）九个维度的分数、理由、原文证据和改进建议，以及 `knowledge_score`、`speaking_score`、`overall_score`。只做文本分析，不评价发音、语速、表情等。
