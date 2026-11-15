@@ -52,4 +52,22 @@ curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
 # completed 时 result 包含 text、language、duration 和带起止时间的 segments
 ```
 
+#### 中文显示
+
+接口返回的是标准 UTF-8 JSON，中文不做转义，直接 `curl` 就能看到中文。
+
+如果把响应交给 `python -m json.tool` 美化，它默认会把非 ASCII 字符转成 `\uXXXX` 转义，看起来像编码问题，其实只是 JSON 转义：
+
+```bash
+# 不推荐：中文会显示成 \u8c37\u5fb7...（json.tool 默认 ensure_ascii=True）
+curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id> | python3 -m json.tool
+
+# 推荐：保持中文原样
+curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id> | python3 -m json.tool --no-ensure-ascii
+curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id> | jq .
+
+# 只看转写文本
+curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id> | jq -r '.result.text'
+```
+
 运行参数在 `src/config.py` 中，通过环境变量配置（`ELY5_WHISPER_MODEL` 默认 `small`、`ELY5_WHISPER_DEVICE`、`ELY5_WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。
