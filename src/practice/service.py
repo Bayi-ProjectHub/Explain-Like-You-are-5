@@ -15,6 +15,10 @@ from pydantic import BaseModel, Field
 
 from ..audio.schemas import TaskStatus, TranscriptionResult
 from ..audio.service import AudioTooLargeError, TaskNotFoundError, TranscriptionService
+from ..delivery.audio import analyze_audio
+from ..delivery.report import DeliveryReporter, align_evidence
+from ..delivery.schemas import DeliveryEvidence, DeliveryReport
+from ..delivery.video import analyze_video
 from .media import MediaError, VIDEO_SUFFIXES, extract_audio
 from .vocabulary import Language, Term
 
@@ -22,13 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 class ModuleState(BaseModel):
-    status: Literal["completed", "pending"]
+    status: Literal["completed", "pending", "failed", "insufficient_evidence"]
     message: str
 
 
 class PracticeTask(BaseModel):
     task_id: str
-    status: Literal["queued", "extracting", "transcribing", "completed", "failed"]
+    status: Literal["queued", "extracting", "transcribing", "analyzing_delivery", "generating_report", "completed", "failed"]
     created_at: datetime
     finished_at: datetime | None = None
     term: Term
@@ -36,6 +40,8 @@ class PracticeTask(BaseModel):
     filename: str
     result: TranscriptionResult | None = None
     modules: dict[str, ModuleState] = Field(default_factory=dict)
+    delivery_evidence: DeliveryEvidence | None = None
+    delivery_report: DeliveryReport | None = None
     error: str | None = None
 
 
@@ -43,11 +49,14 @@ class PracticeService:
     def __init__(
         self, transcription_service: TranscriptionService, upload_dir: Path,
         max_upload_mb: int, max_video_seconds: int = 600,
+        video_model_path: Path | None = None, reporter: DeliveryReporter | None = None,
     ) -> None:
         self._audio = transcription_service
         self._upload_dir = upload_dir
         self._max_bytes = max_upload_mb * 1024 * 1024
         self._max_seconds = max_video_seconds
+        self._video_model_path = video_model_path
+        self._reporter = reporter
         self._tasks: dict[str, PracticeTask] = {}
         self._paths: dict[str, Path] = {}
         self._lock = threading.Lock()
@@ -93,27 +102,19 @@ class PracticeService:
         try:
             async with self._worker:
                 self._update(task_id, status="extracting")
-                await asyncio.to_thread(extract_audio, video_path, audio_path, self._max_seconds)
+                audio_offset = await asyncio.to_thread(extract_audio, video_path, audio_path, self._max_seconds)
                 self._update(task_id, status="transcribing")
                 task = self.get(task_id)
                 with audio_path.open("rb") as audio_file:
                     upload = UploadFile(filename="extracted.wav", file=audio_file)
                     transcription = await self._audio.submit(upload, language=task.language)
-                audio_path.unlink(missing_ok=True)
                 await asyncio.to_thread(self._audio.process, transcription.task_id, task.language)
                 completed = self._audio.get(transcription.task_id)
                 if completed.status != TaskStatus.COMPLETED or completed.result is None:
                     raise MediaError("语音转写失败，请稍后重试；如持续失败，请检查服务端模型配置。")
                 if not completed.result.text.strip():
                     raise MediaError("没有识别到讲话，请检查音量和麦克风后重试。")
-                self._update(
-                    task_id, status="completed", result=completed.result,
-                    finished_at=datetime.now(timezone.utc), modules={
-                        "transcription": ModuleState(status="completed", message="音轨提取与语音转写已完成"),
-                        "text_evaluation": ModuleState(status="pending", message="文本评价模块待接入，尚未生成评分或建议"),
-                        "video_evaluation": ModuleState(status="pending", message="视频评价模块待接入，尚未分析画面或表现"),
-                    },
-                )
+                await self._analyze_delivery(task, video_path, audio_path, audio_offset, completed.result)
         except Exception as exc:
             logger.exception("练习任务 %s 失败", task_id)
             message = str(exc) if isinstance(exc, MediaError) else "处理遇到问题，请稍后重试。"
@@ -122,6 +123,53 @@ class PracticeService:
             video_path.unlink(missing_ok=True)
             audio_path.unlink(missing_ok=True)
             self._paths.pop(task_id, None)
+
+    async def _analyze_delivery(self, task: PracticeTask, video_path: Path, audio_path: Path,
+                                offset: float, transcript: TranscriptionResult) -> None:
+        modules = {
+            "transcription": ModuleState(status="completed", message="音轨提取与语音转写已完成"),
+            "text_evaluation": ModuleState(status="pending", message="独立文本评分尚未接入练习"),
+            "video_evaluation": ModuleState(status="pending", message="服务未配置视觉模型"),
+            "delivery_report": ModuleState(status="pending", message="云端综合报告未启用"),
+        }
+        evidence = DeliveryEvidence(audio_offset_seconds=round(offset, 6))
+        self._update(task.task_id, status="analyzing_delivery", result=transcript)
+        try:
+            evidence.audio = await asyncio.to_thread(analyze_audio, audio_path, offset, transcript)
+            modules["audio_evidence"] = (
+                ModuleState(status="completed", message="声音证据已提取") if evidence.audio else
+                ModuleState(status="insufficient_evidence", message="本次音轨的节奏证据不足")
+            )
+        except Exception:
+            logger.exception("练习任务 %s 声音分析失败", task.task_id)
+            modules["audio_evidence"] = ModuleState(status="failed", message="声音证据提取失败")
+
+        if self._video_model_path is not None:
+            try:
+                evidence.visual = await asyncio.to_thread(
+                    analyze_video, video_path, self._video_model_path, self._max_seconds,
+                )
+                modules["video_evaluation"] = (
+                    ModuleState(status="completed", message="视觉证据已提取") if evidence.visual.windows else
+                    ModuleState(status="insufficient_evidence", message="画面中没有足够可见的特征")
+                )
+            except Exception:
+                logger.exception("练习任务 %s 画面分析失败", task.task_id)
+                modules["video_evaluation"] = ModuleState(status="failed", message="画面分析失败")
+
+        align_evidence(evidence, transcript)
+        report = None
+        if self._reporter is not None:
+            self._update(task.task_id, status="generating_report", delivery_evidence=evidence, modules=modules.copy())
+            try:
+                report = await asyncio.to_thread(self._reporter.generate, task.term, task.language, transcript, evidence)
+                modules["delivery_report"] = ModuleState(status="completed", message="综合报告已生成")
+            except Exception as exc:
+                # Provider and schema errors can include private transcript-derived text.
+                logger.warning("练习任务 %s 云端报告失败（%s）", task.task_id, type(exc).__name__)
+                modules["delivery_report"] = ModuleState(status="failed", message="云端报告生成失败")
+        self._update(task.task_id, status="completed", finished_at=datetime.now(timezone.utc),
+                     modules=modules, delivery_evidence=evidence, delivery_report=report)
 
     def get(self, task_id: str) -> PracticeTask:
         with self._lock:

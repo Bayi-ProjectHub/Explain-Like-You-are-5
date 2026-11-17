@@ -5,6 +5,9 @@ from __future__ import annotations
 from io import BytesIO
 from fractions import Fraction
 from pathlib import Path
+from contextlib import contextmanager
+from types import SimpleNamespace
+import json
 
 import av
 import numpy as np
@@ -13,6 +16,8 @@ from fastapi.testclient import TestClient
 
 from src.audio.schemas import Segment, TranscriptionResult
 from src.audio.service import TranscriptionService
+from src.delivery.report import DeliveryReporter
+from src.delivery.schemas import DIMENSIONS, Evidence, VisualEvidence
 from src.practice.media import MediaError, extract_audio
 from src.practice.service import PracticeService
 from src.practice.vocabulary import load_vocabulary
@@ -42,7 +47,7 @@ class RecordingTranscriber:
         )
 
 
-def make_video(*, with_audio=True, with_video=True) -> bytes:
+def make_video(*, with_audio=True, with_video=True, with_voice=False, audio_start=0) -> bytes:
     """用已有 PyAV 生成 1 秒媒体，无需安装独立 ffmpeg。"""
     output = BytesIO()
     with av.open(output, mode="w", format="matroska") as container:
@@ -63,9 +68,13 @@ def make_video(*, with_audio=True, with_video=True) -> bytes:
             for packet in video.encode(None):
                 container.mux(packet)
         if with_audio:
-            frame = av.AudioFrame.from_ndarray(np.zeros((1, 16000), dtype=np.int16), format="s16", layout="mono")
+            samples = np.zeros((1, 16000), dtype=np.int16)
+            if with_voice:
+                samples[:, :3200] = 8000
+                samples[:, -3200:] = 8000
+            frame = av.AudioFrame.from_ndarray(samples, format="s16", layout="mono")
             frame.sample_rate = 16000
-            frame.pts = 0
+            frame.pts = audio_start
             frame.time_base = Fraction(1, 16000)
             for packet in audio.encode(frame):
                 container.mux(packet)
@@ -183,3 +192,78 @@ def test_product_page_and_existing_root_remain_available(client):
     assert "讲解师" in response.text
     assert client.get("/app/app.js").status_code == 200
     assert client.get("/app/styles.css").status_code == 200
+
+
+def test_extract_audio_reports_offset_in_original_playback(tmp_path):
+    video, audio = tmp_path / "offset.mkv", tmp_path / "offset.wav"
+    video.write_bytes(make_video(audio_start=4000))
+    assert extract_audio(video, audio, max_seconds=2) == pytest.approx(0.25, abs=0.002)
+
+
+@pytest.mark.parametrize("valid_citation", [True, False])
+def test_delivery_report_combines_video_audio_and_transcript(client, tmp_path, monkeypatch, valid_citation):
+    def visual_analysis(path, model_path, max_seconds):
+        assert path.is_file()
+        return VisualEvidence(sample_hz=6, coverage={"hands": 1}, windows=[
+            Evidence(id="V1", start=0.1, end=0.95, metrics={"gesture_bursts": 1}),
+        ])
+
+    def complete(**options):
+        payload = json.loads(options["messages"][1]["content"])
+        assert payload["topic"] == "Goodhart’s law"
+        assert [entry["id"] for entry in payload["evidence"]] == ["V1", "A1"]
+        assert [entry["transcript_ids"] for entry in payload["evidence"]] == [[0], [0]]
+        assert payload["evidence"][1]["metrics"]["quiet_seconds"] == 0.6
+        citations = {"gesture": ["V1"], "voice": ["A1"], "structure": ["T0"],
+                     "coordination": ["V1", "T0"] if valid_citation else ["V1", "T99"]}
+        content = json.dumps({"summary": "Timeline feedback", "feedback": [
+            {"dimension": name, "status": "observed" if name in citations else "insufficient_evidence",
+             "evidence_ids": citations.get(name, []), "observation": "Observation" if name in citations else "",
+             "suggestion": "Try it again" if name in citations else ""} for name in DIMENSIONS
+        ]})
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    @contextmanager
+    def cloud_client(**kwargs):
+        assert kwargs["base_url"] == "https://api.deepseek.com"
+        yield SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=complete)))
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setattr("src.practice.service.analyze_video", visual_analysis)
+    monkeypatch.setattr("src.delivery.report.OpenAI", cloud_client)
+    app.state.practice_service = PracticeService(
+        TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
+        video_model_path=tmp_path / "test.task", reporter=DeliveryReporter(),
+    )
+    response = submit(client, make_video(with_voice=True))
+    task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
+    assert task["status"] == "completed"
+    assert task["modules"]["video_evaluation"]["status"] == "completed"
+    assert task["modules"]["audio_evidence"]["status"] == "completed"
+    assert task["result"]["segments"][0]["id"] == 0
+    if valid_citation:
+        assert task["modules"]["delivery_report"]["status"] == "completed"
+        assert len(task["delivery_report"]["feedback"]) == 7
+    else:
+        assert task["modules"]["delivery_report"]["status"] == "failed"
+        assert task["delivery_report"] is None
+    assert not list(tmp_path.rglob("*.mkv"))
+    assert not list(tmp_path.rglob("*.wav"))
+
+
+def test_vision_failure_preserves_audio_and_transcript(client, tmp_path, monkeypatch):
+    def missing_model(*args):
+        raise FileNotFoundError("test.task")
+
+    monkeypatch.setattr("src.practice.service.analyze_video", missing_model)
+    app.state.practice_service = PracticeService(
+        TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
+        video_model_path=tmp_path / "test.task",
+    )
+    response = submit(client, make_video(with_voice=True))
+    task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
+    assert task["status"] == "completed"
+    assert task["modules"]["video_evaluation"]["status"] == "failed"
+    assert task["result"]["text"]
+    assert task["delivery_evidence"]["visual"] is None
+    assert task["delivery_evidence"]["audio"][0]["transcript_ids"] == [0]

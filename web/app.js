@@ -63,6 +63,8 @@ const en = {
   uploadStage: "Upload video",
   extractStage: "Read audio",
   transcribeStage: "Transcribe speech",
+  deliveryStage: "Analyze delivery",
+  cloudReportNotice: "The delivery report sends the topic, transcript, and audio and visual summaries to DeepSeek.",
   reconnect: "Continue checking results",
   newPractice: "Start a new practice",
   resultKicker: "A RECORD OF WHAT YOU LEARNED",
@@ -71,7 +73,7 @@ const en = {
   fullText: "Full explanation",
   segments: "By segment",
   transcriptCaution:
-    "Transcripts can contain recognition errors. This result shows speech text; content and presentation evaluation are not connected yet.",
+    "The transcript may contain recognition errors. You can check the report against the original video.",
   downloadResult: "↓ Save this result",
   practiceAgain: "Explore another concept",
   footer: "Every explanation is a chance to learn.",
@@ -170,6 +172,7 @@ function renderLanguage() {
     "One example, one key distinction, one sentence to remember…",
   );
   if (catalog) {
+    $("cloud-report-notice").hidden = !catalog.delivery_report_enabled;
     const category = $("category");
     category
       .querySelectorAll("option:not(:first-child)")
@@ -316,9 +319,14 @@ function pauseTimer() {
 }
 function clearFile() {
   selectedFile = null;
-  $("video-preview").pause();
-  $("video-preview").removeAttribute("src");
-  $("video-preview").load();
+  for (const id of ["video-preview", "result-video"]) {
+    const player = $(id);
+    player.pause();
+    if (player.hasAttribute("src")) {
+      player.removeAttribute("src");
+      player.load();
+    }
+  }
   if (videoUrl) URL.revokeObjectURL(videoUrl);
   videoUrl = null;
   $("video-file").value = "";
@@ -383,8 +391,8 @@ function renderProcessing(status) {
     extracting: [
       words("正在读取视频音轨", "Reading your video’s audio"),
       words(
-        "正在提取声音，视频画面的评价模块尚未接入。",
-        "Extracting speech audio. Visual evaluation is not connected yet.",
+        "正在提取视频中的声音。",
+        "Extracting the audio from your video.",
       ),
     ],
     transcribing: [
@@ -394,6 +402,14 @@ function renderProcessing(status) {
         "The first use may need to download a speech model and take longer. You can wait here.",
       ),
     ],
+    analyzing_delivery: [
+      words("正在提取表达证据", "Analyzing your delivery"),
+      words("正在分析声音和可用的画面特征。", "Analyzing audio and available visual features."),
+    ],
+    generating_report: [
+      words("正在生成综合报告", "Preparing your report"),
+      words("正在结合转写和带时间段的证据。", "Combining your transcript with timestamped evidence."),
+    ],
   };
   const [heading, description] = descriptions[status] || descriptions.queued;
   $("processing-heading").textContent = heading;
@@ -402,7 +418,7 @@ function renderProcessing(status) {
     ? formatTime((Date.now() - processingStarted) / 1000)
     : "";
   const active =
-    { uploading: 0, queued: 1, extracting: 1, transcribing: 2 }[status] ?? 1;
+    { uploading: 0, queued: 1, extracting: 1, transcribing: 2, analyzing_delivery: 3, generating_report: 3 }[status] ?? 1;
   document.querySelectorAll("[data-processing]").forEach((el, i) => {
     el.classList.toggle("current", i === active);
     el.classList.toggle("complete", i < active);
@@ -568,12 +584,13 @@ function renderResult(task) {
   $("full-text").textContent = task.result.text;
   $("full-text").lang = task.result.language || task.language;
   $("segments").replaceChildren();
+  const audioOffset = task.delivery_evidence?.audio_offset_seconds || 0;
   for (const segment of task.result.segments || []) {
     const row = document.createElement("div");
     row.className = "segment-row";
     const time = document.createElement("span");
     time.className = "segment-time";
-    time.textContent = `${formatTime(Math.floor(segment.start))}–${formatTime(Math.floor(segment.end))}`;
+    time.textContent = `${formatTime(Math.floor(segment.start + audioOffset))}–${formatTime(segment.end + audioOffset)}`;
     const text = document.createElement("p");
     text.textContent = segment.text;
     row.append(time, text);
@@ -584,25 +601,101 @@ function renderResult(task) {
       "这次转写没有提供分段时间。",
       "This transcript has no segment timestamps.",
     );
-  $("evaluation-modules").replaceChildren();
-  for (const [key, cn, english] of [
-    ["text_evaluation", "内容与讲解逻辑", "Content & explanation"],
-    ["video_evaluation", "视频与表达表现", "Video & delivery"],
-  ]) {
+  renderDelivery(task);
+}
+
+function renderDelivery(task) {
+  const container = $("evaluation-modules");
+  const player = $("result-video");
+  container.replaceChildren();
+  player.hidden = !videoUrl;
+  if (videoUrl && player.getAttribute("src") !== videoUrl) player.src = videoUrl;
+  if (!videoUrl) player.removeAttribute("src");
+
+  const evidence = task.delivery_evidence;
+  const visual = evidence?.visual?.windows || [];
+  const audio = evidence?.audio || [];
+  const offset = evidence?.audio_offset_seconds || 0;
+  const transcript = (task.result.segments || []).map((segment) => ({
+    id: `T${segment.id}`, start: segment.start + offset, end: segment.end + offset,
+  }));
+  const timeline = new Map([...visual, ...audio, ...transcript].map((entry) => [entry.id, entry]));
+  const statusLabels = {
+    completed: words("已完成", "Ready"),
+    pending: words("未启用", "Not enabled"),
+    insufficient_evidence: words("证据不足", "Insufficient evidence"),
+    failed: words("生成失败", "Unavailable"),
+  };
+
+  function createCard(title, status, body) {
     const card = document.createElement("article");
     card.className = "module-card";
     const badge = document.createElement("span");
-    badge.textContent = words("待接入", "Not connected");
+    badge.textContent = statusLabels[status] || statusLabels.pending;
     const heading = document.createElement("h3");
-    heading.textContent = words(cn, english);
-    const description = document.createElement("p");
-    description.textContent =
-      state.ui === "zh"
-        ? task.modules?.[key]?.message || "评价模块待接入，尚未生成结果。"
-        : "Evaluation is not connected yet. No score or feedback has been generated.";
-    card.append(badge, heading, description);
-    $("evaluation-modules").append(card);
+    heading.textContent = title;
+    const copy = document.createElement("p");
+    copy.textContent = body;
+    card.append(badge, heading, copy);
+    container.append(card);
+    return card;
   }
+
+  createCard(words("画面证据", "Visual evidence"), task.modules?.video_evaluation?.status,
+    words(`${visual.length} 个有可用特征的时间段`, `${visual.length} time windows with visible features`));
+  createCard(words("声音证据", "Audio evidence"), task.modules?.audio_evidence?.status,
+    words(`${audio.length} 条语速或低音量记录`, `${audio.length} pace or quiet-interval observations`));
+
+  const report = task.delivery_report;
+  const card = createCard(words("综合表达反馈", "Delivery report"), task.modules?.delivery_report?.status,
+    report?.summary || words("本次练习没有综合报告。可以下载已取得的证据。",
+      "There is no report for this practice. You can download the available evidence."));
+  card.classList.add("delivery-report-card");
+  if (!report) return;
+  card.querySelector("p").lang = task.language;
+  const dimensions = {
+    gaze: words("镜头朝向与视线变化", "Head direction and gaze changes"),
+    posture: words("姿态", "Posture"),
+    gesture: words("手势", "Gestures"),
+    face: words("面部动作", "Facial movement"),
+    voice: words("声音节奏", "Vocal pacing"),
+    structure: words("讲解结构", "Explanation structure"),
+    coordination: words("动作与内容配合", "Delivery and content"),
+  };
+  const list = document.createElement("ul");
+  list.className = "delivery-feedback";
+  for (const item of report.feedback) {
+    const row = document.createElement("li");
+    const label = document.createElement("strong");
+    label.textContent = dimensions[item.dimension];
+    const detail = document.createElement("p");
+    if (item.status === "observed") {
+      detail.lang = task.language;
+      detail.textContent = `${item.observation} ${item.suggestion}`;
+    } else {
+      detail.textContent = statusLabels.insufficient_evidence;
+    }
+    row.append(label, detail);
+    for (const id of item.evidence_ids) {
+      const entry = timeline.get(id);
+      if (!entry) continue;
+      const time = `${formatTime(Math.floor(entry.start))}–${formatTime(entry.end)}`;
+      const link = document.createElement(videoUrl ? "button" : "small");
+      link.textContent = videoUrl ? words(`回看 ${time}`, `Review ${time}`) : `${time} `;
+      if (videoUrl) {
+        link.type = "button";
+        link.className = "text-button";
+        link.addEventListener("click", () => {
+          player.currentTime = entry.start;
+          player.focus();
+          player.play().catch(() => {});
+        });
+      }
+      row.append(link);
+    }
+    list.append(row);
+  }
+  card.append(list);
 }
 
 function resetPractice() {
@@ -758,9 +851,9 @@ document.querySelector(".result-tabs").addEventListener("keydown", (event) => {
     $(segmented ? "segments-tab" : "full-tab").focus();
   }
 });
-window.addEventListener("pagehide", () => {
+window.addEventListener("pagehide", (event) => {
   persist();
-  if (videoUrl) URL.revokeObjectURL(videoUrl);
+  if (!event.persisted && videoUrl) URL.revokeObjectURL(videoUrl);
 });
 setInterval(() => {
   if (state.stage === "prepare") renderTimer();

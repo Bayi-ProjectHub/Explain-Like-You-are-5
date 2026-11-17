@@ -19,6 +19,7 @@ async def vocabulary(category: str | None = None, difficulty: Difficulty | None 
         "version": catalog.version, "categories": catalog.categories,
         "terms": filter_terms(category, difficulty),
         "limits": {"max_upload_mb": settings.max_upload_mb, "max_video_seconds": settings.max_video_seconds},
+        "delivery_report_enabled": settings.delivery_report_enabled,
     }
 
 
