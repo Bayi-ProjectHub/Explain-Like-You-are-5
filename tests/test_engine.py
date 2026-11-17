@@ -16,6 +16,7 @@ class _FakeSegment:
     start: float
     end: float
     text: str
+    words: list | None = None
 
 
 @dataclass
@@ -31,7 +32,8 @@ class _StubModel:
     def __init__(self, segments: list[_FakeSegment]) -> None:
         self._segments = segments
 
-    def transcribe(self, audio_path, language=None, vad_filter=False):
+    def transcribe(self, audio_path, language=None, vad_filter=False, word_timestamps=False):
+        assert vad_filter and word_timestamps
         return iter(self._segments), _FakeInfo(
             language=language or "en",
             language_probability=0.99,

@@ -8,7 +8,7 @@
 2. 开始准备计时，可暂停、加时、提前进入上传；笔记留在浏览器会话里，不上传、不评价。
 3. 用手机或电脑录好讲解视频，再选择或拖入页面。页面支持本地预览，当前没有网页内录制功能。
 4. 上传后轮询练习任务。上传百分比来自浏览器真实进度；提取和转写只显示阶段，不虚构模型进度。
-5. 完成后查看转写、配有时间戳的声音和画面证据、云端综合报告（如已启用）并下载 JSON。当前会话可以用本地视频回看报告引用的时间段。
+5. 完成后查看转写、配有时间戳的声音和画面证据、本地视频报告并下载 Markdown。当前会话可以用本地视频回看报告引用的时间段。
 
 界面语言和讲解语言相互独立。页面在桌面与手机宽度下使用不同布局。刷新后会从 `sessionStorage` 恢复题目、笔记、倒计时以及任务编号；尚未提交的本地视频必须重新选择。网络查询连续失败或超过 15 分钟后暂停自动查询，用户可以继续查看原任务。
 
@@ -67,7 +67,7 @@ curl http://127.0.0.1:8000/practice/submissions/TASK_ID
 }
 ```
 
-状态流为 `queued → extracting → transcribing → analyzing_delivery → [generating_report →] completed`。媒体或转写失败时任务进入 `failed`。后续任一附加模块失败时，任务仍可返回转写和已取得的证据。
+状态流为 `queued → extracting → transcribing → analyzing_delivery → completed`。媒体或转写失败时任务进入 `failed`。后续任一附加模块失败时，任务仍可返回转写和已取得的证据。
 
 完成后 `result` 直接复用音频模块的 `TranscriptionResult`，包含 `text`、`language`、`language_probability`、`duration` 和 `segments`（`id`、`start`、`end`、`text`，时间单位为秒）。现有 `/audio/transcriptions/{task_id}` 返回的 `result` 对象可直接复用；练习任务在外层追加题目与模块状态，不改旧接口。
 
@@ -79,7 +79,7 @@ curl http://127.0.0.1:8000/practice/submissions/TASK_ID
   "text_evaluation": {"status": "pending", "message": "文本评价模块待接入，尚未生成评分或建议"},
   "video_evaluation": {"status": "completed", "message": "视觉证据已提取"},
   "audio_evidence": {"status": "completed", "message": "声音证据已提取"},
-  "delivery_report": {"status": "completed", "message": "综合报告已生成"}
+  "delivery_report": {"status": "completed", "message": "本地视频报告已生成"}
 }
 ```
 
@@ -87,7 +87,7 @@ curl http://127.0.0.1:8000/practice/submissions/TASK_ID
 
 ## 表达证据与综合报告
 
-`delivery_evidence` 包含视觉窗口、声音事件和音轨时间偏移。证据使用原视频播放时间，`result.segments` 继续使用音轨时间。`delivery_report` 可为空，生成成功时包含七维反馈和证据 ID。原视频和 WAV 在任务退出时清理。具体字段、运行条件与后续校准任务见 [交接文档](DELIVERY_HANDOFF.md)。独立的文本评分接口仍可使用。
+`delivery_evidence` 包含视觉窗口、声音事件和音轨时间偏移。证据使用原视频播放时间，`result.segments` 继续使用音轨时间。`delivery_report.timeline` 把可定位的画面动作和音频证据按播放时间排列。每项附在时间上重叠的转写原话。原视频和 WAV 在任务退出时清理。具体字段、运行条件与后续校准任务见 [交接文档](DELIVERY_HANDOFF.md)。独立的文本评分接口仍可使用。
 
 ## 验证与边界
 

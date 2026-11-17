@@ -35,7 +35,6 @@ class Settings:
     # 用户端视频的音轨时长上限，默认 10 分钟
     max_video_seconds: int = 600
     video_model_path: Path | None = None
-    delivery_report_enabled: bool = False
 
 
 def load_settings() -> Settings:
@@ -48,5 +47,4 @@ def load_settings() -> Settings:
         max_upload_mb=int(_env("MAX_UPLOAD_MB", "200")),
         max_video_seconds=int(_env("MAX_VIDEO_SECONDS", "600")),
         video_model_path=Path(video_model_path) if video_model_path else None,
-        delivery_report_enabled=_env("DELIVERY_REPORT_ENABLED", "false").lower() in {"true", "1"},
     )

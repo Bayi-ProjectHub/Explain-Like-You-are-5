@@ -830,6 +830,14 @@ progress {
   display: inline-block;
   margin: 2px 8px 0 0;
 }
+.delivery-feedback time {
+  margin-right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.segment-row .review-time {
+  font: inherit;
+  padding: 2px 1px;
+}
 @media (min-width: 1400px) {
   main {
     padding-top: 52px;

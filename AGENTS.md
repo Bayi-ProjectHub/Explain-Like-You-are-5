@@ -22,7 +22,7 @@ Implemented in `src/audio/`:
 - `router.py` — 异步 HTTP 接口：
 
   - `POST /audio/transcriptions`：multipart 上传，字段 `file`、可选 `language`；立即返回 `202` 和 `task_id`。
-  - `GET /audio/transcriptions/{task_id}`：轮询状态 `queued | processing | completed | failed`；完成后 `result` 为整段文本加带秒级起止时间的分句。
+  - `GET /audio/transcriptions/{task_id}`：轮询状态 `queued | processing | completed | failed`；完成后 `result` 为整段文本、分句及可用的词级时间戳。
 
 - 配置在 `src/config.py`，全部来自环境变量：`WHISPER_MODEL`（默认 `small`）、`WHISPER_DEVICE`（默认 `cpu`）、`WHISPER_COMPUTE_TYPE`（默认 `int8`）、`UPLOAD_DIR`、`MAX_UPLOAD_MB`（默认 `200`）。模型从 huggingface_hub 下载，网络受限时可用 `HF_ENDPOINT` 指定镜像。
 
@@ -48,10 +48,10 @@ Implemented in `src/evaluation/`:
 - `web/` — 同源静态用户端，入口 `/app/`，使用原生 HTML/CSS/JS，无额外构建依赖。原来的 `/` JSON 健康响应及 `/audio/*` 接口保持兼容。
 - `src/practice/vocabulary.json` — 36 个中英配对概念，6 类领域、3 档难度；`vocabulary.py` 负责加载校验与随机抽题。
 - `src/practice/media.py` — 用已有 PyAV 提取单声道 16 kHz WAV，并返回 WAV 相对于原视频的时间偏移。
-- `src/practice/service.py` — 复用 `TranscriptionService`，再编排本地证据和可选云端报告。任务逐个处理，状态为 `queued | extracting | transcribing | analyzing_delivery | generating_report | completed | failed`。`completed` 表示已结束且转写可用，各附加模块是否成功看 `modules`。
+- `src/practice/service.py` — 复用 `TranscriptionService`，再把视觉事件、声音证据和转写整合为本地报告。任务逐个处理，状态为 `queued | extracting | transcribing | analyzing_delivery | completed | failed`。`completed` 表示已结束且转写可用，各附加模块是否成功看 `modules`。
 - `src/practice/router.py` — `GET /practice/vocabulary`、`GET /practice/terms/random`、`POST /practice/submissions`、`GET /practice/submissions/{task_id}`。
 - 追加配置 `MAX_VIDEO_SECONDS`（默认 600，限制解码音轨长度），复用 `MAX_UPLOAD_MB`。正常完成和失败均删除视频及生成的临时音轨。
-- `src/delivery/video.py` — 可选的 MediaPipe Holistic，输出眼神、姿态、手势和面部动作四路 `VisualEvidence`。`src/delivery/audio.py` 提取声音节奏，`src/delivery/report.py` 将视觉、音频和转写对齐后交给可选的 DeepSeek 报告生成器。独立 `POST /evaluations` 仍可单独使用。运行、接口和交接见 `docs/DELIVERY_HANDOFF.md`。
+- `src/delivery/video.py` — 可选的 MediaPipe Holistic，输出眼神、姿态、手势和面部动作四路 `VisualEvidence`。`src/delivery/audio.py` 提取声音节奏，`src/delivery/report.py` 将视觉、音频和词级转写对齐到播放时间，用于本地视频报告。独立 `POST /evaluations` 仍可单独使用。运行、接口和交接见 `docs/DELIVERY_HANDOFF.md`。
 - 任务记录仍为进程内存，仅支持单 worker；服务重启丢任务。页面使用 `sessionStorage` 保存当前练习，文件需重新选择，不保存原视频。
 - 测试：`tests/test_practice.py` 使用 PyAV 生成真实容器验证媒体提取，用假引擎测试转写编排；这不等于真实模型准确率验证。真实模型验证需另外记录使用的模型和视频来源。
 

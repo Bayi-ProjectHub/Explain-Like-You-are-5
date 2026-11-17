@@ -1,13 +1,10 @@
-"""Timestamped evidence and the optional coaching report."""
+"""Timestamped evidence and the local video report."""
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-Dimension = Literal["gaze", "posture", "gesture", "face", "voice", "structure", "coordination"]
-DIMENSIONS: tuple[Dimension, ...] = (
-    "gaze", "posture", "gesture", "face", "voice", "structure", "coordination",
-)
+VisualKind = Literal["gaze", "posture", "gesture", "face"]
 
 
 class Evidence(BaseModel):
@@ -18,6 +15,10 @@ class Evidence(BaseModel):
     transcript_ids: list[int] = Field(default_factory=list)
 
 
+class VisualEvent(Evidence):
+    kind: VisualKind
+
+
 class VisualEvidence(BaseModel):
     schema_version: Literal[1] = 1
     model: Literal["mediapipe_holistic"] = "mediapipe_holistic"
@@ -25,6 +26,7 @@ class VisualEvidence(BaseModel):
     # Coverage is relative to sampled frames. Missing metrics stay absent.
     coverage: dict[str, float]
     windows: list[Evidence]
+    events: list[VisualEvent] = Field(default_factory=list)
 
 
 class DeliveryEvidence(BaseModel):
@@ -33,18 +35,21 @@ class DeliveryEvidence(BaseModel):
     audio: list[Evidence] = Field(default_factory=list)
 
 
-class Feedback(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+class SpeechExcerpt(BaseModel):
+    segment_id: int
+    start: float
+    end: float
+    text: str
+    precision: Literal["word", "segment"]
 
-    dimension: Dimension
-    status: Literal["observed", "insufficient_evidence"]
-    evidence_ids: list[str] = Field(max_length=3)
-    observation: str = Field(max_length=400)
-    suggestion: str = Field(max_length=400)
+
+class ReportMoment(BaseModel):
+    start: float
+    end: float
+    kind: VisualKind | Literal["quiet", "pace"]
+    metrics: dict[str, float | int]
+    speech: list[SpeechExcerpt]
 
 
 class DeliveryReport(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    summary: str = Field(min_length=1, max_length=600)
-    feedback: list[Feedback] = Field(min_length=7, max_length=7)
+    timeline: list[ReportMoment]

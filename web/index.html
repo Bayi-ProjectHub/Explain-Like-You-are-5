@@ -298,9 +298,6 @@
             <p class="quiet upload-tip" data-i18n="uploadTip">
               找一个安静的地方，确认人声清楚。视频在处理结束后会从服务器删除。
             </p>
-            <p id="cloud-report-notice" class="quiet upload-tip" data-i18n="cloudReportNotice" hidden>
-              综合报告会将题目、转写和音视频特征摘要发送给 DeepSeek。
-            </p>
           </div>
           <article id="processing" class="processing" aria-live="polite" hidden>
             <div class="processing-top">
@@ -417,7 +414,7 @@
           <video id="result-video" class="result-video" controls playsinline preload="metadata" hidden></video>
           <div id="evaluation-modules" class="evaluation-modules"></div>
           <p class="quiet small" data-i18n="transcriptCaution">
-            转写可能包含识别错误。可以用原视频核对报告中的时间段。
+            转写和动作时间为本地估算，可以用原视频核对。
           </p>
           <div class="actions">
             <button
@@ -426,7 +423,7 @@
               type="button"
               data-i18n="downloadResult"
             >
-              ↓ 保存这次结果</button
+              ↓ 下载视频报告</button
             ><button id="practice-again" class="primary" type="button">
               <span data-i18n="practiceAgain">再探索一个概念</span
               ><span aria-hidden="true">↗</span>

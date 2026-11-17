@@ -8,9 +8,9 @@ from statistics import mean
 import av
 import numpy as np
 
-from .schemas import Evidence, VisualEvidence
+from .schemas import Evidence, VisualEvent, VisualEvidence, VisualKind
 
-SAMPLE_HZ = 6.0
+SAMPLE_HZ = 10.0
 WINDOW_SECONDS = 2.0
 GESTURE_SPEED_THRESHOLD = 0.6  # Shoulder widths per second; an initial heuristic.
 # Only report changes in movement-related coefficients. They are not emotions.
@@ -145,6 +145,43 @@ def summarize_window(frames: list[FrameSignals]) -> dict[str, float | int]:
     return metrics
 
 
+def detect_visual_events(frames: list[FrameSignals]) -> list[VisualEvent]:
+    """Use sampled playback times, retaining separate bouts within a sentence."""
+    thresholds: dict[VisualKind, dict[str, float]] = {
+        "gesture": {"wrist_speed_shoulder_widths_per_second": GESTURE_SPEED_THRESHOLD},
+        "gaze": {"head_turn_change_per_second": 0.35, "iris_change_per_second": 0.65},
+        "posture": {"lean_change_degrees_per_second": 12, "shoulder_motion_widths_per_second": 0.8},
+        "face": {"face_coefficient_change_per_second": 0.45},
+    }
+    events: list[VisualEvent] = []
+    previous: dict[VisualKind, VisualEvent] = {}
+    for before, after in zip(frames, frames[1:]):
+        dt = after.time - before.time
+        if not 0 < dt <= 2.5 / SAMPLE_HZ:
+            continue
+        measured = summarize_window([before, after])
+        if before.face_turn is not None and after.face_turn is not None:
+            measured["head_turn_change_per_second"] = abs(after.face_turn - before.face_turn) / dt
+        if before.torso_lean is not None and after.torso_lean is not None:
+            measured["lean_change_degrees_per_second"] = abs(after.torso_lean - before.torso_lean) / dt
+        for kind, limits in thresholds.items():
+            peaks = {metric: round(measured[metric], 3) for metric, limit in limits.items()
+                     if measured.get(metric, 0) >= limit}
+            if not peaks:
+                continue
+            start, end = round(before.time, 3), round(after.time, 3)
+            last = previous.get(kind)
+            if last is not None and last.end == start:
+                last.end = end
+                for metric, peak in peaks.items():
+                    last.metrics[metric] = max(peak, last.metrics.get(metric, 0))
+            else:
+                event = VisualEvent(id=f"E{len(events) + 1}", start=start, end=end, kind=kind, metrics=peaks)
+                events.append(event)
+                previous[kind] = event
+    return events
+
+
 def analyze_video(path: Path, model_path: Path, max_seconds: int) -> VisualEvidence:
     import mediapipe as mp
 
@@ -194,4 +231,5 @@ def analyze_video(path: Path, model_path: Path, max_seconds: int) -> VisualEvide
         if metrics and start < end:
             windows.append(Evidence(id=f"V{index + 1}", start=start, end=end, metrics=metrics))
     return VisualEvidence(sample_hz=SAMPLE_HZ, coverage={key: round(value / max(1, len(frames)), 3)
-                                                        for key, value in coverage.items()}, windows=windows)
+                                                        for key, value in coverage.items()}, windows=windows,
+                          events=detect_visual_events(frames))

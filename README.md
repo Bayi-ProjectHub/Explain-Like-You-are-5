@@ -39,7 +39,7 @@ uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 
 启动服务后打开 http://127.0.0.1:8000/app/
 
-当前用户端流程：**中英抽题、计时准备、上传讲解视频、转写、提取表达证据、查看和下载结果**。配置视觉模型后可提取画面证据，启用云端报告后可结合转写、画面和声音生成七维反馈。
+当前用户端流程：**中英抽题、计时准备、上传讲解视频、转写、提取表达证据、查看和下载结果**。报告将动作和声音观察对齐到词级转写时间，支持按时间回看并下载 Markdown。练习报告在本地生成。
 
 - 词库包含 36 个中英配对概念、6 个领域、3 档难度。界面语言与讲解语言可分别选择。
 - 支持 MP4、MOV、WebM、MKV、M4V；默认上限 200 MB、音轨 10 分钟。媒体处理复用已有 PyAV，不需要另外安装 ffmpeg 命令。
@@ -47,9 +47,9 @@ uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 
 词库维护、产品接口与后续模块整合见 [docs/PRODUCT.md](docs/PRODUCT.md)。页面由现有 FastAPI 服务提供。
 
-### 启用画面分析与综合报告
+### 启用画面分析
 
-运行 `uv sync --locked --extra video`，下载 [MediaPipe Holistic 模型](https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task)，在 `.env` 中配置 `VIDEO_MODEL_PATH`。如需云端报告，再配置 `DELIVERY_REPORT_ENABLED=true` 和 `DEEPSEEK_API_KEY`。云端请求包含题目、转写和结构化证据摘要。安装命令、结果字段和验证方法见 [交接文档](docs/DELIVERY_HANDOFF.md)。
+运行 `uv sync --locked --extra video`，下载 [MediaPipe Holistic 模型](https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task)，在 `.env` 中配置 `VIDEO_MODEL_PATH`。安装命令、报告字段和验证方法见 [交接文档](docs/DELIVERY_HANDOFF.md)。
 
 ### 音频转写接口
 
@@ -65,7 +65,7 @@ curl -s -F "file=@demo.wav" -F "language=zh" http://127.0.0.1:8000/audio/transcr
 # 2. 轮询任务
 curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
 # status: queued | processing | completed | failed
-# completed 时 result 包含 text、language、duration 和带起止时间的 segments
+# completed 时 result 包含 text、language、duration 和带起止时间的 segments 和词级 words
 ```
 
 运行参数在 `src/config.py` 中，通过环境变量配置（`WHISPER_MODEL` 默认 `small`、`WHISPER_DEVICE`、`WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。

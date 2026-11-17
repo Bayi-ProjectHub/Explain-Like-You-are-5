@@ -1,14 +1,12 @@
-# 演讲视频分析交接
+# 本地视频内容报告交接
 
-## 工作状态
+## 当前实现
 
-分支 `feature/multimodal-delivery-feedback` 从 `main` 的 `fe69921` 开始。架构依据是用户提供的图，视频和时间戳进入 MediaPipe Holistic，分别提取眼神、姿态、手势和面部动作，再生成 Visual Evidence JSON，和音频及转写合并生成七维报告。
+分支 `feature/multimodal-delivery-feedback` 从 `main` 的 `fe69921` 开始。当前版本在练习上传后，本地运行 faster-whisper 与 MediaPipe Holistic，将动作、声音测量和转写合到原视频播放时间，生成中英界面可浏览、可回看的报告。页面支持下载 Markdown。之前提交中的云端七维点评已从练习任务移除。独立的 `POST /evaluations` 仍可供文本评测模块单独使用，练习流程没有调用它。
 
-第一版已经接入练习上传、后台处理、任务查询、结果页面和 JSON 下载。视觉模型和云端报告可在 `.env` 分别启用。视觉或云端失败时仍返回转写和已取得的其他证据。视频分析结果是测量记录，综合报告提供带证据的定性建议。图中未给出七维名称，当前暂定为镜头朝向与视线变化、姿态、手势、面部动作、声音节奏、讲解结构、动作与内容配合。团队如果已有正式量表，从 `src/delivery/schemas.py` 的 `DIMENSIONS` 和 `src/delivery/report.py` 的提示词、证据校验开始调整。
+## 在 Windows 上启动
 
-## 启动和配置
-
-以下为仓库根目录下的 PowerShell 示例。先安装 `uv`。在已有 `.env` 时继续使用它。
+在仓库根目录执行。已有 `.env` 时保留其内容。
 
 ```powershell
 uv sync --locked --extra video
@@ -17,81 +15,46 @@ curl.exe --fail --location 'https://storage.googleapis.com/mediapipe-models/holi
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-在 `.env` 中设置 `VIDEO_MODEL_PATH=data/models/holistic_landmarker.task`。模型文件在忽略目录 `data/` 下，下载地址固定为上游版本 `1`。本次下载的 SHA-256 为 `e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8`。如果只测试视觉和音频，保留 `DELIVERY_REPORT_ENABLED=false`。确需生成报告时填写自己的 `DEEPSEEK_API_KEY` 并设 `DELIVERY_REPORT_ENABLED=true`。报告使用与独立文本评测相同的 `EVALUATION_MODEL`，默认 `deepseek-flash`。切换配置后重启服务。
+在 `.env` 中设置 `VIDEO_MODEL_PATH=data/models/holistic_landmarker.task`。官方模型 SHA-256 为 `e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8`，模型文件保存在 Git 忽略目录。所有练习报告无需 API 密钥。首次运行可能从 Hugging Face 下载 Whisper 权重，也可以把 `WHISPER_MODEL` 指向本地 CTranslate2 模型目录。开发机可用多语种 `tiny`，项目默认 `small`。
 
 ```powershell
 uv run --locked --extra video uvicorn src.serve:app --env-file .env --port 8000
 ```
 
-打开 `http://127.0.0.1:8000/app/`，抽题后选择一段带人声的视频提交。Whisper 首次可能需要联网下载，可把 `WHISPER_MODEL` 指向本地 CTranslate2 模型目录。仅用转写和声音时，可省略 `--extra video` 和 `VIDEO_MODEL_PATH`。
+访问 <http://127.0.0.1:8000/app/>。选题和讲解语言后上传带人声的视频。缺少视觉模型时，页面仍能显示转写和声音时间线，并标明画面分析未启用。若需从页面回看，使用浏览器支持播放的 MP4 或 WebM。当前浏览器会话保留本地视频引用，刷新后保留报告和时间戳。
 
-## 从哪里继续读代码
+## 处理链和文件边界
 
 | 位置 | 职责 |
 | --- | --- |
-| `src/serve.py`、`src/config.py` | 启动 FastAPI，配置视觉模型文件和报告生成器。 |
-| `src/practice/media.py` | 生成 16 kHz 单声道 WAV。按源时间戳补齐音轨里的间隙，并返回首个 WAV 样本在原视频中的秒数。 |
-| `src/practice/service.py` | 复用已有转写服务，随后读取原视频和 WAV 提取证据，再选用 DeepSeek 生成报告。模型推理和网络请求在线程中运行。原视频与工作 WAV 在任务退出时清理。 |
-| `src/delivery/video.py` | PyAV 按播放时间抽帧，长边最多 640 像素。Holistic 的 `VIDEO` 模式同时返回 478 个脸部点、33 个身体点、左右手各 21 个点（检出时），另可返回面部动作系数。用 6 Hz 抽样和 2 秒时间窗口转换成局部统计。 |
-| `src/delivery/audio.py` | 对同一条 WAV 计算声音相对能量，并从转写分段估算节奏。英语保留拉丁词/分钟，中文保留汉字/分钟，混合段分开计数。 |
-| `src/delivery/schemas.py`、`src/delivery/report.py` | 定义 API 模型、选择要发给云端的窗口、将时序证据与转写关联、请求和验证七维报告。 |
-| `web/app.js` | 更新处理和结果状态。报告用证据 ID 查找原始时间戳。上传后只要页面仍持有本地视频，可点击时间段播放。刷新后保留结果和时间标签，浏览器不再持有文件。 |
+| `src/practice/media.py` | PyAV 输出 16 kHz 单声道 WAV，保留 PCM 时间戳间隙并返回音轨起点相对视频的偏移。 |
+| `src/audio/engine.py` | 使用本地 faster-whisper。启用 VAD 和 `word_timestamps`，返回可用的词级估计。 |
+| `src/delivery/video.py` | 在原视频时间轴以目标 10 Hz 采样，长边最多 640 像素。Holistic 提取身体、脸、手关键点和部分面部动作系数。保留 2 秒统计窗口，并独立生成相邻采样帧间的动作事件。 |
+| `src/delivery/audio.py` | 在同一 WAV 测低声音能量区段，并根据转写分段估计中文汉字或拉丁字母词的语速。 |
+| `src/delivery/report.py` | 以原视频秒数严格关联重叠的动作、声音与词；无词级数据的分段才退回分段级。用程序组装报告。 |
+| `src/practice/service.py` | 编排媒体、转写和证据生成；保留成功的模块结果，临时视频与工作 WAV 在任务退出时清理。 |
+| `web/app.js` | 用毫秒级数据格式化为百分秒显示。报告动作与同期原话各保留自己的起止时间，点击回看动作。按时间的转写视图可点击有时间的词。下载 Markdown 含时间线和完整转写。 |
 
-## API 和时间轴
+视觉事件分别检测头部朝向/眼部位置、上半身姿态、手腕移动、面部动作。同类相邻活动会合并，间隔或遮挡将其断开。两次动作可同时挂在同一个分句 ID 上，各自引用所在时间内重叠的词。动作阈值仍是工程初值，短于采样间隔的动作可能漏检。眼部变化与真实眼神交流是两个不同概念，肩部移动也可能受到镜头移动影响。报告只描述可测信号。
 
-仍从 `POST /practice/submissions` 上传。上传字段为 `file`、`term_id`、`language`。用 `GET /practice/submissions/{task_id}` 轮询。状态依次为 `queued`、`extracting`、`transcribing`、`analyzing_delivery`，启用报告时再经过 `generating_report`。`completed` 表示任务结束且转写成功。查看 `modules.video_evaluation`、`modules.audio_evidence`、`modules.delivery_report` 判断各模块是否成功、未启用或证据不足。`result` 仍是原有音频转写结构，独立的 `POST /evaluations` 九维文本评分保留。七维报告在单次云端请求内直接读取转写做结构点评，不重复发起九维评分请求。
+## API 和时间
 
-结果新增 `delivery_evidence` 和 `delivery_report`。视觉和音频证据的 `start`、`end` 都是原视频播放秒数。旧 `result.segments` 仍以 WAV 开头为零点，加 `audio_offset_seconds` 后才能和原视频比对。证据的 `transcript_ids` 是与当前窗口相交或在其边界 0.4 秒内的转写片段编号。云端请求包含题目、练习目标、完整有序转写（无分段时使用全文）、视觉可见率、最多 19 个代表性视觉窗口，以及最多 20 条声音证据。窗口选择保留开头、中间、结尾和各指标高低值，详细窗口仍可从任务 JSON 下载。
+原任务接口仍为 `POST /practice/submissions` 与 `GET /practice/submissions/{task_id}`。状态为 `queued → extracting → transcribing → analyzing_delivery → completed`，媒体或转写问题会进入 `failed`。视觉模型失败时报告仍可返回其他模块数据。
 
-视觉 JSON 示例，数值仅为示意：
+- `result.segments[].start/end` 和 `result.segments[].words[].start/end` 均以音轨为零点，单位秒。旧客户端可继续使用分句。
+- `delivery_evidence.audio_offset_seconds` 是 WAV 首样本在原视频时间轴上的时间。与视频比较时给音频时间加这个偏移。
+- `delivery_evidence.visual.windows/events` 和 `delivery_evidence.audio` 已在原视频时间轴上。事件 ID 和显示顺序属于单次任务。
+- `delivery_report.timeline[]` 含 `kind`、`start`、`end`、该项测量值与 `speech[]`。每段原话有 `segment_id`、独立的原视频起止时间和 `precision`。时间重叠为空时保持空数组。报告不把事件时间强行挪到某个词的开始。
 
-```json
-{
-  "schema_version": 1,
-  "model": "mediapipe_holistic",
-  "sample_hz": 6,
-  "coverage": {"face": 0.91, "iris": 0.69, "upper_body": 0.94, "hands": 0.85},
-  "windows": [
-    {"id": "V4", "start": 6.0, "end": 8.0, "metrics": {"gesture_bursts": 1}, "transcript_ids": [2]}
-  ]
-}
-```
-
-| 评测维度 | 证据与计算口径 |
-| --- | --- |
-| 镜头朝向与视线变化 | `face_turn_offset` 用鼻尖在脸部横轴上的相对位置近似头部朝向。`iris_change_per_second` 仅在近正脸时计算虹膜相对眼角位置变化。这两个指标不表示真实眼神交流。 |
-| 姿态 | `torso_lean_degrees` 是肩中心至髋中心连线在画面里的侧倾角。`shoulder_motion_widths_per_second` 用肩宽归一化画面中的肩中心移动。镜头移动也会影响读数。 |
-| 手势 | 手部与手腕均检出后，测量相对于肩部的手腕速度和窗口内活动范围。`gesture_bursts` 是窗口内速度跨过经验阈值的次数。目前发给云端的是 2 秒窗口的起止时间，逐个动作的精确起止需要另做连续事件检测。 |
-| 面部动作 | `face_coefficient_change_per_second` 汇总选定的眉、眼睑、下巴和嘴角动作系数变化。说话本身会影响数值。 |
-| 声音节奏 | `quiet_seconds` 是夹在较高能量区间之间、持续至少 0.6 秒的相对低能量段。语速来自至少 2 秒的 ASR 片段，容易受转写错误影响。 |
-| 讲解结构 | 根据整段转写看主旨、衔接和收束，引用 `T` 开头的转写 ID。 |
-| 动作与内容配合 | 引用时间重叠的 `V` 与 `A` 或 `T` 证据，说明动作与所讲内容可能如何配合。 |
-
-无可用点位时，窗口 JSON 里缺省对应指标。报告的每个维度都必须出现一次。`observed` 必须给实际存在且与维度匹配的证据 ID、观察和建议。`insufficient_evidence` 对应的三个内容字段留空。配合项额外校验时间交集，前端由 ID 解析时间，云端输出只负责解释。引用通过结构校验不代表解释本身已经验证。报告失败时看服务端日志中的异常类型。日志刻意省略模型回复和转写内容。
-
-## 方案评估与修改
-
-- **姿态分类。** 先按各部位可观测性决定哪些指标能产出，避免半身或侧身录像被错误路由。坐站、PPT 识别和观众定位仍待支持。
-- **依赖。** VERA 的旧 NumPy 固定版本与本仓库冲突。实际采用 MediaPipe Tasks 和 PyAV。`video` 是可选依赖，锁定的 Windows 实测版本为 MediaPipe 1.2.3、PyAV 18.1.0、Python 3.12.16。
-- **时间偏移。** 先前 WAV 在转写前就被删除，且音轨开头不一定与视频相同。现在保留工作 WAV 到分析结束，提取时保留音轨间隙并记录偏移。无 PTS 的老文件采用顺序 PCM 写入。
-- **云端故障。** 独立可开关，默认关闭。生成器超时 60 秒，不自动重试，云端故障降级为已有本地结果。任务仍用原有单进程内存状态，报告等待期间该练习占用一个工作槽。
-
-## 验证与下一步
+## 验证和后续
 
 ```powershell
 uv run --locked --extra video pytest -q
 node --check web/app.js
 ```
 
-- `tests/test_visual_evidence.py` 用合成信号断言四路视觉指标及遮挡退化。`tests/test_practice.py` 使用真实 PyAV 容器，覆盖偏移、声音事件、视觉模块故障、有效和无效证据引用，以及原文件清理。
-- 真实 DeepSeek 调用需要可用密钥。自动接口测试会替换云端客户端，检查实际发出的结构和服务是否接收符合约束的回复。环境中的真实模型与浏览器实测见下方验证记录。
-- 下一位先用几段获得授权的中英真人短讲回看正常、半身、侧身、竖屏旋转和手出画等条件。逐段对比事件时间和真实行为，再调抽帧率、手势阈值和可见性门槛。对照同一句话附近的动作，核验报告的解释是否由证据支持。
-- PPT 分析可在第七维增加独立幻灯片证据和画面覆盖字段。建议用同一原视频时间轴关联幻灯片、转写和身体朝向，补完样本后才评估指向或观众互动。短片云端复核、准确率标注、报告重试和持久化均尚未实现。
+`tests/test_practice.py` 包含音频晚起 0.25 秒、同一句中两次手势匹配不同词的回归测试。`tests/test_visual_evidence.py` 检查动作时间跨越旧统计窗口边界，以及遮挡和采样间隙。已有真实转写测试可用 `RUN_INTEGRATION=1` 和已下载的本地模型运行。试看片、报告和本地演示相关文件保存在 Git 忽略的 `data/` 下。
 
-### 实测记录
+想提升准确率时，用不同机位的真人短讲逐个标注动作起止，再测事件误报、漏检和时间偏差。音频内容质量还受本地模型、语言选择与录音条件影响。后续要接其他模块时，请共用原视频时间轴，并选用已有 `delivery_report.timeline` 作为可核对的合并结果。
 
-- 全量 `pytest` 为 **28 passed**。额外用了 `RUN_INTEGRATION=1` 和本地 `WHISPER_MODEL` 路径来启用已有的真实音频转写测试。`node --check web/app.js` 通过。
-- Windows 上用真实 MediaPipe Holistic 和 faster-whisper `tiny.en`，通过上传和轮询接口跑通两个 11 秒 MP4。素材由 [MediaPipe 全身图](https://storage.googleapis.com/mediapipe-assets/pose.jpg)、[MediaPipe 正脸图](https://storage.googleapis.com/mediapipe-assets/portrait.jpg) 与 [Whisper JFK 样例音频](https://github.com/openai/whisper/blob/main/tests/jfk.flac) 合成。首次约 4.00 秒，第二段约 2.24 秒。全身样片输出姿态和手势，近景样片覆盖四路视觉指标，两者均输出声音证据与转写关联，结束后临时文件已清理。这是用来验证数据流的合成样片，不能用于验证动作识别准确率、正常使用延迟或报告质量。
-- 浏览器用 Edge 跑通上传、云端发送说明、七维报告、中英切换、按证据跳转播放、刷新恢复结果。在宽度 320、390、768、1024 和 1440 像素下检查了结果页无横向溢出。视觉和语音使用真实模型，DeepSeek 使用模拟响应。当前环境没有 DeepSeek 密钥，真实云端报告等待联调。运行时样片和模型均在 Git 忽略的 `data/` 下。
-
-量表依据采用本地改写，参考 [Elizabeth Johnston / Lumen Learning 口头演讲量表（CC BY 4.0）](https://courses.lumenlearning.com/atd-monroecc-collegecomp/chapter/oral-presentation-assignment/) 的结构、表达和多媒体维度，以及 [Toastmasters 肢体语言量表](https://ccdn.toastmasters.org/medias/files/department-documents/education-documents/evaluation-resources/english/8203e-evaluation-resource-ffe.pdf) 的手势观察思路。具体首版字段和证据规则是本项目的实现决策。模型 API 见 [MediaPipe Holistic](https://developers.google.com/edge/mediapipe/solutions/vision/holistic_landmarker?tab=Python) 和 [DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/)。
+参考 [faster-whisper 词级时间戳](https://github.com/SYSTRAN/faster-whisper#word-level-timestamps) 和 [MediaPipe Holistic API](https://developers.google.com/edge/mediapipe/solutions/vision/holistic_landmarker?tab=Python)。

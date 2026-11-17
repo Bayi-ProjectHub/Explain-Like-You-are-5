@@ -11,7 +11,6 @@ from .audio.router import router as audio_router
 from .audio.service import TranscriptionService
 from .evaluation.router import router as evaluation_router
 from .config import PROJECT_ROOT, load_settings
-from .delivery.report import DeliveryReporter
 from .practice.router import router as practice_router
 from .practice.service import PracticeService
 from .practice.vocabulary import load_vocabulary
@@ -38,7 +37,6 @@ async def lifespan(app: FastAPI):
         app.state.transcription_service, settings.upload_dir / "practice",
         settings.max_upload_mb, settings.max_video_seconds,
         video_model_path=settings.video_model_path,
-        reporter=DeliveryReporter() if settings.delivery_report_enabled else None,
     )
     logger.info("音频转写模块就绪（模型 %s）", settings.whisper_model)
     yield

@@ -5,19 +5,15 @@ from __future__ import annotations
 from io import BytesIO
 from fractions import Fraction
 from pathlib import Path
-from contextlib import contextmanager
-from types import SimpleNamespace
-import json
 
 import av
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from src.audio.schemas import Segment, TranscriptionResult
+from src.audio.schemas import Segment, TimedWord, TranscriptionResult
 from src.audio.service import TranscriptionService
-from src.delivery.report import DeliveryReporter
-from src.delivery.schemas import DIMENSIONS, Evidence, VisualEvidence
+from src.delivery.schemas import Evidence, VisualEvent, VisualEvidence
 from src.practice.media import MediaError, extract_audio
 from src.practice.service import PracticeService
 from src.practice.vocabulary import load_vocabulary
@@ -200,53 +196,46 @@ def test_extract_audio_reports_offset_in_original_playback(tmp_path):
     assert extract_audio(video, audio, max_seconds=2) == pytest.approx(0.25, abs=0.002)
 
 
-@pytest.mark.parametrize("valid_citation", [True, False])
-def test_delivery_report_combines_video_audio_and_transcript(client, tmp_path, monkeypatch, valid_citation):
+def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, monkeypatch):
     def visual_analysis(path, model_path, max_seconds):
         assert path.is_file()
-        return VisualEvidence(sample_hz=6, coverage={"hands": 1}, windows=[
-            Evidence(id="V1", start=0.1, end=0.95, metrics={"gesture_bursts": 1}),
+        return VisualEvidence(sample_hz=10, coverage={"hands": 1}, windows=[], events=[
+            VisualEvent(id="E1", kind="gesture", start=0.35, end=0.46,
+                        metrics={"wrist_speed_shoulder_widths_per_second": 1}),
+            VisualEvent(id="E2", kind="gesture", start=0.99, end=1.1,
+                        metrics={"wrist_speed_shoulder_widths_per_second": 1.2}),
         ])
 
-    def complete(**options):
-        payload = json.loads(options["messages"][1]["content"])
-        assert payload["topic"] == "Goodhart’s law"
-        assert [entry["id"] for entry in payload["evidence"]] == ["V1", "A1"]
-        assert [entry["transcript_ids"] for entry in payload["evidence"]] == [[0], [0]]
-        assert payload["evidence"][1]["metrics"]["quiet_seconds"] == 0.6
-        citations = {"gesture": ["V1"], "voice": ["A1"], "structure": ["T0"],
-                     "coordination": ["V1", "T0"] if valid_citation else ["V1", "T99"]}
-        content = json.dumps({"summary": "Timeline feedback", "feedback": [
-            {"dimension": name, "status": "observed" if name in citations else "insufficient_evidence",
-             "evidence_ids": citations.get(name, []), "observation": "Observation" if name in citations else "",
-             "suggestion": "Try it again" if name in citations else ""} for name in DIMENSIONS
-        ]})
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    def transcribe(path, language):
+        return TranscriptionResult(text="First example.", language=language, duration=1, segments=[
+            Segment(id=0, start=0, end=1, text="First example.", words=[
+                TimedWord(start=0.1, end=0.2, text=" First"),
+                TimedWord(start=0.75, end=0.9, text=" example."),
+            ]),
+        ])
 
-    @contextmanager
-    def cloud_client(**kwargs):
-        assert kwargs["base_url"] == "https://api.deepseek.com"
-        yield SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=complete)))
-
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
     monkeypatch.setattr("src.practice.service.analyze_video", visual_analysis)
-    monkeypatch.setattr("src.delivery.report.OpenAI", cloud_client)
+    monkeypatch.setattr(client.engine, "transcribe", transcribe)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "unused")
+    monkeypatch.setenv("DELIVERY_REPORT_ENABLED", "true")
     app.state.practice_service = PracticeService(
         TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
-        video_model_path=tmp_path / "test.task", reporter=DeliveryReporter(),
+        video_model_path=tmp_path / "test.task",
     )
-    response = submit(client, make_video(with_voice=True))
+    response = submit(client, make_video(with_voice=True, audio_start=4000))
     task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
     assert task["status"] == "completed"
-    assert task["modules"]["video_evaluation"]["status"] == "completed"
-    assert task["modules"]["audio_evidence"]["status"] == "completed"
-    assert task["result"]["segments"][0]["id"] == 0
-    if valid_citation:
-        assert task["modules"]["delivery_report"]["status"] == "completed"
-        assert len(task["delivery_report"]["feedback"]) == 7
-    else:
-        assert task["modules"]["delivery_report"]["status"] == "failed"
-        assert task["delivery_report"] is None
+    assert task["modules"]["delivery_report"]["status"] == "completed"
+    assert task["delivery_evidence"]["audio_offset_seconds"] == 0.25
+    moments = task["delivery_report"]["timeline"]
+    assert [item["kind"] for item in moments] == ["gesture", "quiet", "gesture"]
+    assert moments[0]["speech"] == [
+        {"segment_id": 0, "start": 0.35, "end": 0.45, "text": "First", "precision": "word"},
+    ]
+    assert moments[-1]["speech"] == [
+        {"segment_id": 0, "start": 1.0, "end": 1.15, "text": "example.", "precision": "word"},
+    ]
+    assert moments[1]["metrics"] == {"quiet_seconds": 0.6}
     assert not list(tmp_path.rglob("*.mkv"))
     assert not list(tmp_path.rglob("*.wav"))
 

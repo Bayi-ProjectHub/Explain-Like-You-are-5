@@ -64,7 +64,6 @@ const en = {
   extractStage: "Read audio",
   transcribeStage: "Transcribe speech",
   deliveryStage: "Analyze delivery",
-  cloudReportNotice: "The delivery report sends the topic, transcript, and audio and visual summaries to DeepSeek.",
   reconnect: "Continue checking results",
   newPractice: "Start a new practice",
   resultKicker: "A RECORD OF WHAT YOU LEARNED",
@@ -73,8 +72,8 @@ const en = {
   fullText: "Full explanation",
   segments: "By segment",
   transcriptCaution:
-    "The transcript may contain recognition errors. You can check the report against the original video.",
-  downloadResult: "↓ Save this result",
+    "Speech and movement timings are local estimates. You can check them against the original video.",
+  downloadResult: "↓ Download video report",
   practiceAgain: "Explore another concept",
   footer: "Every explanation is a chance to learn.",
 };
@@ -172,7 +171,6 @@ function renderLanguage() {
     "One example, one key distinction, one sentence to remember…",
   );
   if (catalog) {
-    $("cloud-report-notice").hidden = !catalog.delivery_report_enabled;
     const category = $("category");
     category
       .querySelectorAll("option:not(:first-child)")
@@ -406,10 +404,6 @@ function renderProcessing(status) {
       words("正在提取表达证据", "Analyzing your delivery"),
       words("正在分析声音和可用的画面特征。", "Analyzing audio and available visual features."),
     ],
-    generating_report: [
-      words("正在生成综合报告", "Preparing your report"),
-      words("正在结合转写和带时间段的证据。", "Combining your transcript with timestamped evidence."),
-    ],
   };
   const [heading, description] = descriptions[status] || descriptions.queued;
   $("processing-heading").textContent = heading;
@@ -418,7 +412,7 @@ function renderProcessing(status) {
     ? formatTime((Date.now() - processingStarted) / 1000)
     : "";
   const active =
-    { uploading: 0, queued: 1, extracting: 1, transcribing: 2, analyzing_delivery: 3, generating_report: 3 }[status] ?? 1;
+    { uploading: 0, queued: 1, extracting: 1, transcribing: 2, analyzing_delivery: 3 }[status] ?? 1;
   document.querySelectorAll("[data-processing]").forEach((el, i) => {
     el.classList.toggle("current", i === active);
     el.classList.toggle("complete", i < active);
@@ -590,9 +584,18 @@ function renderResult(task) {
     row.className = "segment-row";
     const time = document.createElement("span");
     time.className = "segment-time";
-    time.textContent = `${formatTime(Math.floor(segment.start + audioOffset))}–${formatTime(segment.end + audioOffset)}`;
+    time.textContent = `${preciseTime(segment.start + audioOffset)}–${preciseTime(segment.end + audioOffset)}`;
     const text = document.createElement("p");
-    text.textContent = segment.text;
+    if (videoUrl && segment.words?.length) {
+      for (const word of segment.words) {
+        const start = word.start + audioOffset;
+        const token = word.text.trim();
+        if (word.text.startsWith(" ")) text.append(" ");
+        text.append(reviewAt(start, `${token} · ${preciseTime(start)}`, token));
+      }
+    } else {
+      text.textContent = segment.text;
+    }
     row.append(time, text);
     $("segments").append(row);
   }
@@ -604,6 +607,80 @@ function renderResult(task) {
   renderDelivery(task);
 }
 
+function preciseTime(seconds) {
+  const ticks = Math.max(0, Math.round(seconds * 100));
+  const minutes = String(Math.floor(ticks / 6000)).padStart(2, "0");
+  const whole = String(Math.floor(ticks / 100) % 60).padStart(2, "0");
+  return `${minutes}:${whole}.${String(ticks % 100).padStart(2, "0")}`;
+}
+
+function reviewAt(time, label, visibleText) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "text-button review-time";
+  button.textContent = visibleText || label;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", () => {
+    const player = $("result-video");
+    player.currentTime = time;
+    player.focus();
+    player.play().catch(() => {});
+  });
+  return button;
+}
+
+function describeMoment(entry) {
+  const metrics = entry.metrics;
+  if (entry.kind === "quiet") {
+    return words(`声音能量较低，持续 ${metrics.quiet_seconds} 秒`,
+      `Low audio energy for ${metrics.quiet_seconds} s`);
+  }
+  if (entry.kind === "pace") {
+    const rates = [];
+    if ("han_characters_per_minute" in metrics) {
+      const count = metrics.han_characters_per_minute;
+      rates.push(words(`约 ${count} 汉字/分钟`, `about ${count} Han characters/min`));
+    }
+    if ("latin_words_per_minute" in metrics) {
+      const count = metrics.latin_words_per_minute;
+      rates.push(words(`约 ${count} 拉丁字母词/分钟`, `about ${count} Latin-script words/min`));
+    }
+    return rates.join(words("、", ", "));
+  }
+  if (entry.kind === "gaze") {
+    const head = "head_turn_change_per_second" in metrics;
+    const iris = "iris_change_per_second" in metrics;
+    if (head && iris) return words("头部朝向和眼部位置有变化", "Head direction and eye position changed");
+    return head ? words("头部朝向有变化", "Head direction changed")
+      : words("眼部位置有变化", "Eye position changed");
+  }
+  return {
+    posture: words("上半身姿态有变化", "Upper-body posture changed"),
+    gesture: words("检测到手腕移动", "Wrist movement detected"),
+    face: words("检测到面部动作变化", "Facial movement detected"),
+  }[entry.kind];
+}
+
+function visualAvailability(task) {
+  const status = task.modules?.video_evaluation?.status;
+  if (status === "completed") return "";
+  if (status === "pending") return words("本次未启用画面分析。", "Visual analysis was not enabled.");
+  if (status === "failed") return words("本次画面分析未完成。", "Visual analysis could not finish.");
+  return words("画面中没有足够清晰的可追踪特征。", "There were too few visible features to track.");
+}
+
+function visualCoverage(task) {
+  const coverage = task.delivery_evidence?.visual?.coverage;
+  if (!coverage) return "";
+  const parts = [
+    ["upper_body", words("上半身", "upper body")],
+    ["hands", words("手部", "hands")],
+    ["face", words("人脸", "face")],
+  ];
+  const values = parts.map(([key, label]) => `${label} ${Math.round((coverage[key] || 0) * 100)}%`);
+  return `${words("抽样检测覆盖率", "Detection coverage in sampled frames")} · ${values.join(" / ")}`;
+}
+
 function renderDelivery(task) {
   const container = $("evaluation-modules");
   const player = $("result-video");
@@ -612,90 +689,53 @@ function renderDelivery(task) {
   if (videoUrl && player.getAttribute("src") !== videoUrl) player.src = videoUrl;
   if (!videoUrl) player.removeAttribute("src");
 
-  const evidence = task.delivery_evidence;
-  const visual = evidence?.visual?.windows || [];
-  const audio = evidence?.audio || [];
-  const offset = evidence?.audio_offset_seconds || 0;
-  const transcript = (task.result.segments || []).map((segment) => ({
-    id: `T${segment.id}`, start: segment.start + offset, end: segment.end + offset,
-  }));
-  const timeline = new Map([...visual, ...audio, ...transcript].map((entry) => [entry.id, entry]));
-  const statusLabels = {
-    completed: words("已完成", "Ready"),
-    pending: words("未启用", "Not enabled"),
-    insufficient_evidence: words("证据不足", "Insufficient evidence"),
-    failed: words("生成失败", "Unavailable"),
-  };
-
-  function createCard(title, status, body) {
-    const card = document.createElement("article");
-    card.className = "module-card";
-    const badge = document.createElement("span");
-    badge.textContent = statusLabels[status] || statusLabels.pending;
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    const copy = document.createElement("p");
-    copy.textContent = body;
-    card.append(badge, heading, copy);
-    container.append(card);
-    return card;
+  const timeline = task.delivery_report?.timeline || [];
+  const card = document.createElement("article");
+  card.className = "module-card delivery-report-card";
+  const heading = document.createElement("h3");
+  heading.textContent = words("视频内容报告", "Video report");
+  const description = document.createElement("p");
+  description.textContent = visualAvailability(task) || (timeline.length
+    ? words("按原视频时间排列，动作旁标出当时说到的词句。",
+      "Observations are in playback order, with the words spoken at each moment.")
+    : words("本次没有检出可列出的动作或声音变化。", "There were no detectable changes to list."));
+  card.append(heading, description);
+  const coverage = visualCoverage(task);
+  if (coverage) {
+    const note = document.createElement("p");
+    note.textContent = coverage;
+    card.append(note);
   }
-
-  createCard(words("画面证据", "Visual evidence"), task.modules?.video_evaluation?.status,
-    words(`${visual.length} 个有可用特征的时间段`, `${visual.length} time windows with visible features`));
-  createCard(words("声音证据", "Audio evidence"), task.modules?.audio_evidence?.status,
-    words(`${audio.length} 条语速或低音量记录`, `${audio.length} pace or quiet-interval observations`));
-
-  const report = task.delivery_report;
-  const card = createCard(words("综合表达反馈", "Delivery report"), task.modules?.delivery_report?.status,
-    report?.summary || words("本次练习没有综合报告。可以下载已取得的证据。",
-      "There is no report for this practice. You can download the available evidence."));
-  card.classList.add("delivery-report-card");
-  if (!report) return;
-  card.querySelector("p").lang = task.language;
-  const dimensions = {
-    gaze: words("镜头朝向与视线变化", "Head direction and gaze changes"),
-    posture: words("姿态", "Posture"),
-    gesture: words("手势", "Gestures"),
-    face: words("面部动作", "Facial movement"),
-    voice: words("声音节奏", "Vocal pacing"),
-    structure: words("讲解结构", "Explanation structure"),
-    coordination: words("动作与内容配合", "Delivery and content"),
-  };
-  const list = document.createElement("ul");
+  if (!videoUrl && timeline.length) {
+    const hint = document.createElement("p");
+    hint.textContent = words("原视频未保存在此页面，可按下列时间在原片中回看。",
+      "The original video is unavailable here. Use the times below to find each moment in your recording.");
+    card.append(hint);
+  }
+  const list = document.createElement("ol");
   list.className = "delivery-feedback";
-  for (const item of report.feedback) {
+  for (const entry of timeline) {
     const row = document.createElement("li");
-    const label = document.createElement("strong");
-    label.textContent = dimensions[item.dimension];
-    const detail = document.createElement("p");
-    if (item.status === "observed") {
-      detail.lang = task.language;
-      detail.textContent = `${item.observation} ${item.suggestion}`;
-    } else {
-      detail.textContent = statusLabels.insufficient_evidence;
-    }
-    row.append(label, detail);
-    for (const id of item.evidence_ids) {
-      const entry = timeline.get(id);
-      if (!entry) continue;
-      const time = `${formatTime(Math.floor(entry.start))}–${formatTime(entry.end)}`;
-      const link = document.createElement(videoUrl ? "button" : "small");
-      link.textContent = videoUrl ? words(`回看 ${time}`, `Review ${time}`) : `${time} `;
-      if (videoUrl) {
-        link.type = "button";
-        link.className = "text-button";
-        link.addEventListener("click", () => {
-          player.currentTime = entry.start;
-          player.focus();
-          player.play().catch(() => {});
-        });
-      }
-      row.append(link);
+    const range = `${preciseTime(entry.start)}–${preciseTime(entry.end)}`;
+    const title = document.createElement("strong");
+    title.textContent = describeMoment(entry);
+    const time = videoUrl ? reviewAt(entry.start, words(`回看 ${range}`, `Review ${range}`), range)
+      : document.createElement("time");
+    if (!videoUrl) time.textContent = range;
+    row.append(time, title);
+    for (const excerpt of entry.speech) {
+      const quote = document.createElement("p");
+      quote.lang = task.result.language || task.language;
+      const speechTime = `${preciseTime(excerpt.start)}–${preciseTime(excerpt.end)}`;
+      const source = excerpt.precision === "segment"
+        ? words("相关分段", "Overlapping segment") : words("同期原话", "Spoken at this time");
+      quote.textContent = `${source} ${speechTime} · ${excerpt.text}`;
+      row.append(quote);
     }
     list.append(row);
   }
-  card.append(list);
+  if (timeline.length) card.append(list);
+  container.append(card);
 }
 
 function resetPractice() {
@@ -818,15 +858,40 @@ $("reconnect").addEventListener("click", () => {
 });
 $("new-after-error").addEventListener("click", resetPractice);
 $("practice-again").addEventListener("click", resetPractice);
+function reportMarkdown(task) {
+  const title = task.term.title[task.language];
+  const duration = task.result.duration;
+  const lines = [
+    `# ${words("视频内容报告", "Video report")} · ${title}`,
+    "",
+    duration == null ? "" : `${words("音轨时长", "Audio duration")} ${preciseTime(duration)}`,
+    visualAvailability(task),
+    visualCoverage(task),
+    words("下列时间以原视频开头为零点。转写和动作时间为估算。",
+      "Times are relative to the start of the video. Speech and movement timings are estimates."),
+    "",
+    `## ${words("时间线", "Timeline")}`,
+    "",
+  ];
+  for (const entry of task.delivery_report?.timeline || []) {
+    lines.push(`- **${preciseTime(entry.start)}–${preciseTime(entry.end)}** ${describeMoment(entry)}`);
+    for (const excerpt of entry.speech) {
+      const source = excerpt.precision === "segment" ? words("相关分段", "Overlapping segment") : words("同期原话", "Speech");
+      lines.push(`  - ${source} ${preciseTime(excerpt.start)}–${preciseTime(excerpt.end)} · ${excerpt.text}`);
+    }
+  }
+  lines.push("", `## ${words("完整转写", "Transcript")}`, "", task.result.text, "");
+  return lines.join("\n");
+}
+
 $("download-result").addEventListener("click", () => {
-  if (!currentResult) return;
-  const blob = new Blob([JSON.stringify(currentResult, null, 2)], {
-    type: "application/json;charset=utf-8",
-  });
+  const task = currentResult;
+  if (!task) return;
+  const blob = new Blob([reportMarkdown(task)], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `ely5-${currentResult.term.id}-${currentResult.task_id.slice(0, 8)}.json`;
+  link.download = `ely5-${task.term.id}-${task.task_id.slice(0, 8)}.md`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });

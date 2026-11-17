@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from ..audio.schemas import TaskStatus, TranscriptionResult
 from ..audio.service import AudioTooLargeError, TaskNotFoundError, TranscriptionService
 from ..delivery.audio import analyze_audio
-from ..delivery.report import DeliveryReporter, align_evidence
+from ..delivery.report import build_delivery_report
 from ..delivery.schemas import DeliveryEvidence, DeliveryReport
 from ..delivery.video import analyze_video
 from .media import MediaError, VIDEO_SUFFIXES, extract_audio
@@ -32,7 +32,7 @@ class ModuleState(BaseModel):
 
 class PracticeTask(BaseModel):
     task_id: str
-    status: Literal["queued", "extracting", "transcribing", "analyzing_delivery", "generating_report", "completed", "failed"]
+    status: Literal["queued", "extracting", "transcribing", "analyzing_delivery", "completed", "failed"]
     created_at: datetime
     finished_at: datetime | None = None
     term: Term
@@ -49,14 +49,13 @@ class PracticeService:
     def __init__(
         self, transcription_service: TranscriptionService, upload_dir: Path,
         max_upload_mb: int, max_video_seconds: int = 600,
-        video_model_path: Path | None = None, reporter: DeliveryReporter | None = None,
+        video_model_path: Path | None = None,
     ) -> None:
         self._audio = transcription_service
         self._upload_dir = upload_dir
         self._max_bytes = max_upload_mb * 1024 * 1024
         self._max_seconds = max_video_seconds
         self._video_model_path = video_model_path
-        self._reporter = reporter
         self._tasks: dict[str, PracticeTask] = {}
         self._paths: dict[str, Path] = {}
         self._lock = threading.Lock()
@@ -130,7 +129,6 @@ class PracticeService:
             "transcription": ModuleState(status="completed", message="音轨提取与语音转写已完成"),
             "text_evaluation": ModuleState(status="pending", message="独立文本评分尚未接入练习"),
             "video_evaluation": ModuleState(status="pending", message="服务未配置视觉模型"),
-            "delivery_report": ModuleState(status="pending", message="云端综合报告未启用"),
         }
         evidence = DeliveryEvidence(audio_offset_seconds=round(offset, 6))
         self._update(task.task_id, status="analyzing_delivery", result=transcript)
@@ -150,24 +148,15 @@ class PracticeService:
                     analyze_video, video_path, self._video_model_path, self._max_seconds,
                 )
                 modules["video_evaluation"] = (
-                    ModuleState(status="completed", message="视觉证据已提取") if evidence.visual.windows else
+                    ModuleState(status="completed", message="视觉证据已提取") if evidence.visual.windows or evidence.visual.events else
                     ModuleState(status="insufficient_evidence", message="画面中没有足够可见的特征")
                 )
             except Exception:
                 logger.exception("练习任务 %s 画面分析失败", task.task_id)
                 modules["video_evaluation"] = ModuleState(status="failed", message="画面分析失败")
 
-        align_evidence(evidence, transcript)
-        report = None
-        if self._reporter is not None:
-            self._update(task.task_id, status="generating_report", delivery_evidence=evidence, modules=modules.copy())
-            try:
-                report = await asyncio.to_thread(self._reporter.generate, task.term, task.language, transcript, evidence)
-                modules["delivery_report"] = ModuleState(status="completed", message="综合报告已生成")
-            except Exception as exc:
-                # Provider and schema errors can include private transcript-derived text.
-                logger.warning("练习任务 %s 云端报告失败（%s）", task.task_id, type(exc).__name__)
-                modules["delivery_report"] = ModuleState(status="failed", message="云端报告生成失败")
+        report = build_delivery_report(evidence, transcript)
+        modules["delivery_report"] = ModuleState(status="completed", message="本地视频报告已生成")
         self._update(task.task_id, status="completed", finished_at=datetime.now(timezone.utc),
                      modules=modules, delivery_evidence=evidence, delivery_report=report)
 
