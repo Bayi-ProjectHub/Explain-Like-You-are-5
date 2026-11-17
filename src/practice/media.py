@@ -44,7 +44,7 @@ def extract_audio(video_path: Path, audio_path: Path, max_seconds: int) -> float
                         if first_sample_pts is None:
                             first_sample_pts = pts - samples
                             origin = (container.start_time or 0) / av.time_base
-                            audio_offset = max(0.0, first_sample_pts / 16000 - origin)
+                            audio_offset = first_sample_pts / 16000 - origin
                         position = pts - first_sample_pts
                     else:
                         position = samples

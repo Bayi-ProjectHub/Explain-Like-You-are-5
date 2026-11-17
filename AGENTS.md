@@ -51,7 +51,7 @@ Implemented in `src/evaluation/`:
 - `src/practice/service.py` — 复用 `TranscriptionService`，再把视觉事件、声音证据和转写整合为本地报告。任务逐个处理，状态为 `queued | extracting | transcribing | analyzing_delivery | completed | failed`。`completed` 表示已结束且转写可用，各附加模块是否成功看 `modules`。
 - `src/practice/router.py` — `GET /practice/vocabulary`、`GET /practice/terms/random`、`POST /practice/submissions`、`GET /practice/submissions/{task_id}`。
 - 追加配置 `MAX_VIDEO_SECONDS`（默认 600，限制解码音轨长度），复用 `MAX_UPLOAD_MB`。正常完成和失败均删除视频及生成的临时音轨。
-- `src/delivery/video.py` — 可选的 MediaPipe Holistic，输出眼神、姿态、手势和面部动作四路 `VisualEvidence`。`src/delivery/audio.py` 提取声音节奏，`src/delivery/report.py` 将视觉、音频和词级转写对齐到播放时间，用于本地视频报告。独立 `POST /evaluations` 仍可单独使用。运行、接口和交接见 `docs/DELIVERY_HANDOFF.md`。
+- `src/delivery/video.py` — 可选的 MediaPipe Holistic，输出眼神、姿态、手势和面部动作四路 `VisualEvidence`。`src/delivery/audio.py` 提取声音节奏，`src/delivery/report.py` 保留视频与音频各自的时间轴，通过偏移匹配词级转写，用于本地视频报告。独立 `POST /evaluations` 仍可单独使用。运行、接口和交接见 `docs/DELIVERY_HANDOFF.md`。
 - 任务记录仍为进程内存，仅支持单 worker；服务重启丢任务。页面使用 `sessionStorage` 保存当前练习，文件需重新选择，不保存原视频。
 - 测试：`tests/test_practice.py` 使用 PyAV 生成真实容器验证媒体提取，用假引擎测试转写编排；这不等于真实模型准确率验证。真实模型验证需另外记录使用的模型和视频来源。
 

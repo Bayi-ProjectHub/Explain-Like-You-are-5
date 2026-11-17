@@ -87,7 +87,7 @@ curl http://127.0.0.1:8000/practice/submissions/TASK_ID
 
 ## 表达证据与综合报告
 
-`delivery_evidence` 包含视觉窗口、声音事件和音轨时间偏移。证据使用原视频播放时间，`result.segments` 继续使用音轨时间。`delivery_report.timeline` 把可定位的画面动作和音频证据按播放时间排列。每项附在时间上重叠的转写原话。原视频和 WAV 在任务退出时清理。具体字段、运行条件与后续校准任务见 [交接文档](DELIVERY_HANDOFF.md)。独立的文本评分接口仍可使用。
+`delivery_evidence` 包含视觉窗口、声音事件和音轨时间偏移。证据使用原视频播放时间，`result.segments` 继续使用音轨时间。`delivery_report` 包含独立视频和音频轨，按各自原有时间记录，通过同步偏移关联。支持选定讲者出镜范围，完整音频仍保留。原视频和 WAV 在任务退出时清理。具体字段、运行条件与后续校准任务见 [交接文档](DELIVERY_HANDOFF.md)。独立的文本评分接口仍可使用。
 
 ## 验证与边界
 

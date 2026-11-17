@@ -197,12 +197,13 @@ def test_extract_audio_reports_offset_in_original_playback(tmp_path):
 
 
 def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, monkeypatch):
-    def visual_analysis(path, model_path, max_seconds):
+    def visual_analysis(path, model_path, max_seconds, ranges):
         assert path.is_file()
-        return VisualEvidence(sample_hz=10, coverage={"hands": 1}, windows=[], events=[
-            VisualEvent(id="E1", kind="gesture", start=0.35, end=0.46,
+        assert [(r.start, r.end) for r in ranges] == [(0.35, 0.55), (0.9, 1.1)]
+        return VisualEvidence(sample_hz=15, video_offset_seconds=0.1, coverage={"hands": 1}, windows=[], events=[
+            VisualEvent(id="E1", kind="gesture", start=0.25, end=0.36,
                         metrics={"wrist_speed_shoulder_widths_per_second": 1}),
-            VisualEvent(id="E2", kind="gesture", start=0.99, end=1.1,
+            VisualEvent(id="E2", kind="gesture", start=0.89, end=1.0,
                         metrics={"wrist_speed_shoulder_widths_per_second": 1.2}),
         ])
 
@@ -222,22 +223,33 @@ def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, m
         TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
         video_model_path=tmp_path / "test.task",
     )
-    response = submit(client, make_video(with_voice=True, audio_start=4000))
+    response = submit(client, make_video(with_voice=True, audio_start=4000),
+                      presenter_ranges='[{"start":0.35,"end":0.55},{"start":0.9,"end":1.1}]')
     task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
     assert task["status"] == "completed"
     assert task["modules"]["delivery_report"]["status"] == "completed"
     assert task["delivery_evidence"]["audio_offset_seconds"] == 0.25
-    moments = task["delivery_report"]["timeline"]
-    assert [item["kind"] for item in moments] == ["gesture", "quiet", "gesture"]
-    assert moments[0]["speech"] == [
-        {"segment_id": 0, "start": 0.35, "end": 0.45, "text": "First", "precision": "word"},
+    report = task["delivery_report"]
+    assert report["sync"] == {"audio_to_playback_seconds": 0.25, "video_to_playback_seconds": 0.1}
+    assert [item["start"] for item in report["video"]] == [0.25, 0.89]
+    assert report["video"][0]["speech"] == [
+        {"segment_id": 0, "start": 0.1, "end": 0.2, "text": "First", "precision": "word"},
     ]
-    assert moments[-1]["speech"] == [
-        {"segment_id": 0, "start": 1.0, "end": 1.15, "text": "example.", "precision": "word"},
+    assert report["video"][1]["speech"] == [
+        {"segment_id": 0, "start": 0.75, "end": 0.9, "text": "example.", "precision": "word"},
     ]
-    assert moments[1]["metrics"] == {"quiet_seconds": 0.6}
+    assert report["audio"][0]["start"] == 0.2
+    assert report["audio"][0]["metrics"] == {"quiet_seconds": 0.6}
+    assert report["video"][0]["audio_refs"] == ["A1", "L1"]
+    assert report["audio_levels"][0]["start"] == 0
+    assert report["audio_levels"][0]["end"] == 1
     assert not list(tmp_path.rglob("*.mkv"))
     assert not list(tmp_path.rglob("*.wav"))
+
+
+def test_reject_overlapping_presenter_ranges(client):
+    response = submit(client, presenter_ranges='[{"start":1,"end":3},{"start":2,"end":4}]')
+    assert response.status_code == 422
 
 
 def test_vision_failure_preserves_audio_and_transcript(client, tmp_path, monkeypatch):

@@ -17,7 +17,7 @@ from ..audio.schemas import TaskStatus, TranscriptionResult
 from ..audio.service import AudioTooLargeError, TaskNotFoundError, TranscriptionService
 from ..delivery.audio import analyze_audio
 from ..delivery.report import build_delivery_report
-from ..delivery.schemas import DeliveryEvidence, DeliveryReport
+from ..delivery.schemas import DeliveryEvidence, DeliveryReport, PlaybackRange
 from ..delivery.video import analyze_video
 from .media import MediaError, VIDEO_SUFFIXES, extract_audio
 from .vocabulary import Language, Term
@@ -38,6 +38,7 @@ class PracticeTask(BaseModel):
     term: Term
     language: Language
     filename: str
+    presenter_ranges: list[PlaybackRange] = Field(default_factory=list)
     result: TranscriptionResult | None = None
     modules: dict[str, ModuleState] = Field(default_factory=dict)
     delivery_evidence: DeliveryEvidence | None = None
@@ -63,7 +64,8 @@ class PracticeService:
         self._worker = asyncio.Lock()
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-    async def submit(self, file: UploadFile, term: Term, language: Language) -> PracticeTask:
+    async def submit(self, file: UploadFile, term: Term, language: Language,
+                     presenter_ranges: list[PlaybackRange] | None = None) -> PracticeTask:
         suffix = Path(file.filename or "").suffix.lower()
         if suffix not in VIDEO_SUFFIXES:
             raise MediaError("请选择 MP4、MOV、WebM、MKV 或 M4V 视频。")
@@ -85,6 +87,7 @@ class PracticeService:
         task = PracticeTask(
             task_id=task_id, status="queued", created_at=datetime.now(timezone.utc),
             term=term, language=language, filename=Path(file.filename or "video").name,
+            presenter_ranges=presenter_ranges or [],
         )
         with self._lock:
             self._tasks[task_id] = task
@@ -133,9 +136,9 @@ class PracticeService:
         evidence = DeliveryEvidence(audio_offset_seconds=round(offset, 6))
         self._update(task.task_id, status="analyzing_delivery", result=transcript)
         try:
-            evidence.audio = await asyncio.to_thread(analyze_audio, audio_path, offset, transcript)
+            evidence.audio, evidence.audio_levels = await asyncio.to_thread(analyze_audio, audio_path, transcript)
             modules["audio_evidence"] = (
-                ModuleState(status="completed", message="声音证据已提取") if evidence.audio else
+                ModuleState(status="completed", message="声音证据已提取") if evidence.audio_levels else
                 ModuleState(status="insufficient_evidence", message="本次音轨的节奏证据不足")
             )
         except Exception:
@@ -145,7 +148,7 @@ class PracticeService:
         if self._video_model_path is not None:
             try:
                 evidence.visual = await asyncio.to_thread(
-                    analyze_video, video_path, self._video_model_path, self._max_seconds,
+                    analyze_video, video_path, self._video_model_path, self._max_seconds, task.presenter_ranges,
                 )
                 modules["video_evaluation"] = (
                     ModuleState(status="completed", message="视觉证据已提取") if evidence.visual.windows or evidence.visual.events else

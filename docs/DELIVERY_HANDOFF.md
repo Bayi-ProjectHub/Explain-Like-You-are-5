@@ -1,60 +1,71 @@
-# 本地视频内容报告交接
+# 双轨视频证据交接
 
-## 当前实现
+## 当前分支和目标
 
-分支 `feature/multimodal-delivery-feedback` 从 `main` 的 `fe69921` 开始。当前版本在练习上传后，本地运行 faster-whisper 与 MediaPipe Holistic，将动作、声音测量和转写合到原视频播放时间，生成中英界面可浏览、可回看的报告。页面支持下载 Markdown。之前提交中的云端七维点评已从练习任务移除。独立的 `POST /evaluations` 仍可供文本评测模块单独使用，练习流程没有调用它。
+分支 `feature/multimodal-delivery-feedback`。本次改动从 `fd8e2c3` 开始，把本地报告拆成独立的画面、音频和转写数据。应用不在练习流程调用云端模型。Markdown 用于人工复核，导出的证据 JSON 可交给后续模块或模型，原始检测值、单位、关联和可见性均保留。样片、模型权重、本地结果和用户视频均在环境本地或 Git 忽略目录。
 
-## 在 Windows 上启动
+## 启动
 
-在仓库根目录执行。已有 `.env` 时保留其内容。
+在仓库根目录进行。可沿用已有 `.env`。
 
 ```powershell
 uv sync --locked --extra video
 New-Item -ItemType Directory -Force data/models | Out-Null
-curl.exe --fail --location 'https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task' --output data/models/holistic_landmarker.task
+$models = @{
+  'holistic_landmarker.task' = 'holistic_landmarker/holistic_landmarker'
+  'face_landmarker.task' = 'face_landmarker/face_landmarker'
+  'pose_landmarker_heavy.task' = 'pose_landmarker/pose_landmarker_heavy'
+  'hand_landmarker.task' = 'hand_landmarker/hand_landmarker'
+}
+foreach ($name in $models.Keys) {
+  curl.exe --fail --location "https://storage.googleapis.com/mediapipe-models/$($models[$name])/float16/1/$name" --output "data/models/$name"
+  if ($LASTEXITCODE -ne 0) { throw "Could not fetch $name" }
+}
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-在 `.env` 中设置 `VIDEO_MODEL_PATH=data/models/holistic_landmarker.task`。官方模型 SHA-256 为 `e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8`，模型文件保存在 Git 忽略目录。所有练习报告无需 API 密钥。首次运行可能从 Hugging Face 下载 Whisper 权重，也可以把 `WHISPER_MODEL` 指向本地 CTranslate2 模型目录。开发机可用多语种 `tiny`，项目默认 `small`。
+在 `.env` 中设置 `VIDEO_MODEL_PATH=data/models/holistic_landmarker.task`，运行 `uv run --locked --extra video uvicorn src.serve:app --env-file .env --port 8000`。访问 <http://127.0.0.1:8000/app/>。三个专用模型同目录且可选，缺少时使用 Holistic 对应输出。装有专用面部模型时每个采样帧优先使用它。转写使用本地 faster-whisper。首次配置某个 Whisper 模型可能需要下载权重，也可指定本地模型路径。手机可编码的 MP4 和 WebM 通常可以回看，具体取决于浏览器。
 
-```powershell
-uv run --locked --extra video uvicorn src.serve:app --env-file .env --port 8000
-```
+选题、上传后可选择性填写讲者出镜时间，例如 `00:05–00:28, 00:35–01:10`。提交 API 是 `POST /practice/submissions`，额外表单字段 `presenter_ranges` 可传 `[{"start":5,"end":28},{"start":35,"end":70}]`。时间使用原播放器秒数，采用左闭右开区间。禁止重叠。未传时分析整片。若输入超出片长，只有交集会分析。剪去观众切镜只作用于画面，音频和转写仍保留整段。当前由用户确认讲者出镜时段，镜头切换检测用来切开运动事件。
 
-访问 <http://127.0.0.1:8000/app/>。选题和讲解语言后上传带人声的视频。缺少视觉模型时，页面仍能显示转写和声音时间线，并标明画面分析未启用。若需从页面回看，使用浏览器支持播放的 MP4 或 WebM。当前浏览器会话保留本地视频引用，刷新后保留报告和时间戳。
+## 报告接口
 
-## 处理链和文件边界
+轮询 `GET /practice/submissions/{task_id}`。旧 `result` 转写字段仍保留。当前 `delivery_report.schema_version=2`，旧版混合 `timeline` 已改为独立轨道。浏览器可读上一个版本的缓存报告。
 
-| 位置 | 职责 |
+| 字段 | 时间零点和内容 |
 | --- | --- |
-| `src/practice/media.py` | PyAV 输出 16 kHz 单声道 WAV，保留 PCM 时间戳间隙并返回音轨起点相对视频的偏移。 |
-| `src/audio/engine.py` | 使用本地 faster-whisper。启用 VAD 和 `word_timestamps`，返回可用的词级估计。 |
-| `src/delivery/video.py` | 在原视频时间轴以目标 10 Hz 采样，长边最多 640 像素。Holistic 提取身体、脸、手关键点和部分面部动作系数。保留 2 秒统计窗口，并独立生成相邻采样帧间的动作事件。 |
-| `src/delivery/audio.py` | 在同一 WAV 测低声音能量区段，并根据转写分段估计中文汉字或拉丁字母词的语速。 |
-| `src/delivery/report.py` | 以原视频秒数严格关联重叠的动作、声音与词；无词级数据的分段才退回分段级。用程序组装报告。 |
-| `src/practice/service.py` | 编排媒体、转写和证据生成；保留成功的模块结果，临时视频与工作 WAV 在任务退出时清理。 |
-| `web/app.js` | 用毫秒级数据格式化为百分秒显示。报告动作与同期原话各保留自己的起止时间，点击回看动作。按时间的转写视图可点击有时间的词。下载 Markdown 含时间线和完整转写。 |
+| `delivery_report.video` | 首个定时解码视频帧为零点。每条用 `E…` ID，包含动作、起止、测量、重叠音频 ID 和重叠原话。 |
+| `delivery_report.audio` | 解码后的 WAV 首样本为零点。保留 `A…` 的低能量段与可算语速区间。 |
+| `delivery_report.audio_levels` | 同一 WAV 时间轴。每个连续 2 秒窗口（末段可能更短）记录 RMS dBFS 和 `L…` ID。音量表示数字音轨电平，无法估算实际分贝声压。 |
+| `delivery_report.transcript` | 同一 WAV 时间轴。完整文本、分句及支持时的词级起止。 |
+| `delivery_report.sync` | 两个独立的本轨到播放器偏移。播放时间 = 轨内时间 + 本轨偏移。匹配语音时，先把视频区间换算成音频轨坐标。原话保留音频轨时间。 |
+| `delivery_evidence.visual` | 覆盖率、样本数、启用的检测分支命中、选择范围和粗略统计窗口。导出 JSON 同样带覆盖率及检测范围。 |
 
-视觉事件分别检测头部朝向/眼部位置、上半身姿态、手腕移动、面部动作。同类相邻活动会合并，间隔或遮挡将其断开。两次动作可同时挂在同一个分句 ID 上，各自引用所在时间内重叠的词。动作阈值仍是工程初值，短于采样间隔的动作可能漏检。眼部变化与真实眼神交流是两个不同概念，肩部移动也可能受到镜头移动影响。报告只描述可测信号。
+例如 JSON 中 `target=right_wrist, axis=y, unit=shoulder_width, delta=-0.32, direction=up` 表示右腕相对右肩沿画面竖轴上移 0.32 个肩宽。画面横轴正数朝画面右侧，竖轴正数朝下。躯干侧倾是肩部中心与臀部中心连线在画面平面的角度。肩部中心移动用肩宽归一，可能混入摄像机运动。眉心、眼睑、嘴角、下颌分别记录 blendshape 系数的起点、终点和差值，系数不等于表情意图或情绪。眼部朝向字段仍为画面相对代理量。手指构形、明确指向目标、身体纵深旋转、说话人身份仍未标注。
 
-## API 和时间
+相邻帧超过方向/幅度阈值后组成区间。遇到方向反转、关键点丢失、跨镜头、跨选择范围或切换模型时打断。视频采用目标 15 Hz，低帧率视频不会重新造帧。目标覆盖率 85% 以分析范围内所有抽样帧为分母，逐项报告，包括人脸、面部系数、上半身、髋肩兼可见和手部。手腕可用姿态估计，手部关键点须通过手部检测质量条件，两者分开统计。
 
-原任务接口仍为 `POST /practice/submissions` 与 `GET /practice/submissions/{task_id}`。状态为 `queued → extracting → transcribing → analyzing_delivery → completed`，媒体或转写问题会进入 `failed`。视觉模型失败时报告仍可返回其他模块数据。
+## 可选 RTMW 和显卡
 
-- `result.segments[].start/end` 和 `result.segments[].words[].start/end` 均以音轨为零点，单位秒。旧客户端可继续使用分句。
-- `delivery_evidence.audio_offset_seconds` 是 WAV 首样本在原视频时间轴上的时间。与视频比较时给音频时间加这个偏移。
-- `delivery_evidence.visual.windows/events` 和 `delivery_evidence.audio` 已在原视频时间轴上。事件 ID 和显示顺序属于单次任务。
-- `delivery_report.timeline[]` 含 `kind`、`start`、`end`、该项测量值与 `speech[]`。每段原话有 `segment_id`、独立的原视频起止时间和 `precision`。时间重叠为空时保持空数组。报告不把事件时间强行挪到某个词的开始。
+CPU 默认走 MediaPipe，使用面部专用模型和局部缺失时的 Pose Heavy、Hand Landmarker。普通机器可先走这条路径。单讲者视频可选择本地 RTMW，只有模型检测到一个人且躯干点质量不低于原模块时才接管身体点位；多人物不会用该模块自动选择身份。
 
-## 验证和后续
+1. 项目用过 `uv pip install --no-deps rtmlib==0.0.16`。项目的 `video` 组合已经提供 cv2 和 NumPy，原依赖提供 ONNX Runtime。用 `--no-deps` 避免同时安装两个提供 cv2 的包。执行项目环境同步后，可能需要重新将这项可选包安装到运行环境。
+2. 从 OpenMMLab 下载 [YOLOX Tiny](https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/yolox_tiny_8xb8-300e_humanart-6f3252f9.zip)、[RTMW-m](https://download.openmmlab.com/mmpose/v1/projects/rtmw/onnx_sdk/rtmw-dw-l-m_simcc-cocktail14_270e-256x192_20231122.zip) 或更大的 [RTMW-l](https://download.openmmlab.com/mmpose/v1/projects/rtmw/onnx_sdk/rtmw-dw-x-l_simcc-cocktail14_270e-384x288_20231122.zip)。分别将压缩包内的 `end2end.onnx` 放到同一目录，命名为 `yolox-tiny.onnx`、`pose-m.onnx`、`pose-l.onnx`。无需两个 pose 权重同时存在。
+3. 设置 `VIDEO_RTMW_DIR=data/models/rtmw`、`VIDEO_RTMW_PRESET=m` 或 `l`。数据库、云端密钥均不需要。启用失败时后端会记录异常，练习仍返回可用的声音和转写。
+4. 默认 `VIDEO_RTMW_DEVICE=cpu`。Windows 可选 `dml` 和 `VIDEO_RTMW_DML_DEVICE_ID=0`；CUDA 可选 `cuda`。换对应 ONNX Runtime（`onnxruntime-directml` 或 `onnxruntime-gpu`），切勿让同一 Python 路径混用多个发行版。可用 `uv pip install --target data/ort-dml --no-deps onnxruntime-directml==1.24.4` 和 `$env:PYTHONPATH=(Resolve-Path data/ort-dml).Path` 单独给一次 Windows 运行提供 DirectML。CUDA 需本机安装匹配的 CUDA 与 cuDNN DLL。程序检查实际执行提供程序；运行日志及 `tracking_sources` 会标识模型。更大的预设及 GPU 并不保证提高某条视频的覆盖率。
 
-```powershell
-uv run --locked --extra video pytest -q
-node --check web/app.js
-```
+来源 [MediaPipe Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker)、[RTMW 官方发布](https://github.com/open-mmlab/mmpose/releases)、[RTMLib](https://github.com/Tau-J/rtmlib)、[ONNX Runtime DirectML](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html) 与 [CUDA](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)。
 
-`tests/test_practice.py` 包含音频晚起 0.25 秒、同一句中两次手势匹配不同词的回归测试。`tests/test_visual_evidence.py` 检查动作时间跨越旧统计窗口边界，以及遮挡和采样间隙。已有真实转写测试可用 `RUN_INTEGRATION=1` 和已下载的本地模型运行。试看片、报告和本地演示相关文件保存在 Git 忽略的 `data/` 下。
+## 本次实测
 
-想提升准确率时，用不同机位的真人短讲逐个标注动作起止，再测事件误报、漏检和时间偏差。音频内容质量还受本地模型、语言选择与录音条件影响。后续要接其他模块时，请共用原视频时间轴，并选用已有 `delivery_report.timeline` 作为可核对的合并结果。
+- Windows，Python 3.12、Ryzen 9 9955HX。32 项测试全通过，含真实本地 Whisper 音频集成测试。`node --check web/app.js` 通过。
+- 本地 1080p 单人讲解前 25 秒，15 Hz 共 375 个采样帧，CPU 路径约 17.5 秒。人脸、面部系数、虹膜可用性和上半身都是 100%。报告有 192 条独立面部系数变化、11 条朝向变化，手腕覆盖 0%，手势事件 0 条。系数条目可在时间上重叠，例如两眼各有一条，不能当作动作总次数。
+- NASA [Earthrise 访谈](https://images.nasa.gov/details/Earthrise%20-%20A%20Conversation%20with%20Apollo%208%20Astronaut%20Bill%20Anders%20%28Official%20NASA%20Video%29) 的 132–151 秒截取段含中间长切镜。不设筛选时人脸覆盖 49.8%；给接口传样片本地播放范围 `[0,4.3)` 与 `[14.5,19)` 后，132 帧里人脸、面部系数和上半身均为 100%。音轨电平仍完整到 19.072 秒。NASA 旧档案整片只有人脸 19.8%、上半身 13.4%，没达到 85%。本次没有把低清、切镜或不可见帧误算成成功。
+- CPU 上 RTMW-m 已实际完成推理。Windows DirectML 上 RTMW-m 和 RTMW-l 都跑通。RTMW-l 以外部的手部可见性作约束后，在 18 帧近景中没有把画外手计入覆盖。未验证 CUDA 执行路径和普通电脑的耗时下限。CPU 足以运行基础路径，速度受素材和机器影响。
 
-参考 [faster-whisper 词级时间戳](https://github.com/SYSTRAN/faster-whisper#word-level-timestamps) 和 [MediaPipe Holistic API](https://developers.google.com/edge/mediapipe/solutions/vision/holistic_landmarker?tab=Python)。
+## 接手顺序和已知问题
+
+- 先运行 `uv run --locked --extra video pytest -q`、`node --check web/app.js`。测试覆盖音视频不同偏移、同期轨道共存、同句多个动作、剪掉指定视觉范围、视频切镜和腕部方向反转。
+- 按独立的人为标记选讲者画面，验证脸部和手部真实入镜，再评估检测样本覆盖率与误报。讲者时段的 85% 与整条剪辑的 85% 必须分别报告。画外手、无人的配图、观众特写没有讲者关键点。
+- 用稳定单人正面、侧面、手出画、背光、观众切镜五类视频分别验收。双人节目需要目标身份关联。现在可以手工排除镜头，但仍需多人跟踪和样本标注，才适合自动区分谁是讲者。
+- 当前值是可复核的近似测量。镜头转动和低画质仍可能引起误报，待加入摄像机运动补偿并校准手势幅度。专业语义分析可以消费导出的 JSON，这条练习链不会自动上传它。

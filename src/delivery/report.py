@@ -1,46 +1,53 @@
-"""Combine local video observations, audio measurements and recognized speech."""
+"""Keep the native clocks and link observations by their overlap in playback time."""
 
 from ..audio.schemas import TranscriptionResult
-from .schemas import DeliveryEvidence, DeliveryReport, ReportMoment, SpeechExcerpt
+from .schemas import DeliveryEvidence, DeliveryReport, ReportMoment, SpeechExcerpt, TimelineSync
 
 
 def build_delivery_report(evidence: DeliveryEvidence, transcript: TranscriptionResult) -> DeliveryReport:
-    offset = evidence.audio_offset_seconds
-    timed_segments = [
-        (segment, [
-            (round(word.start + offset, 3), round(word.end + offset, 3), word.text)
-            for word in segment.words
-        ]) for segment in transcript.segments
-    ]
+    visual = evidence.visual
+    audio_shift = evidence.audio_offset_seconds
+    video_shift = visual.video_offset_seconds if visual else 0.0
+    video_in_audio = round(video_shift - audio_shift, 6)
 
     def overlapping_speech(start: float, end: float) -> list[SpeechExcerpt]:
         excerpts = []
-        for segment, timed_words in timed_segments:
-            if timed_words:
-                matches = [(a, b, text) for a, b, text in timed_words if a < end and b > start]
+        for segment in transcript.segments:
+            if segment.words:
+                matches = [word for word in segment.words if word.start < end and word.end > start]
                 if matches:
                     excerpts.append(SpeechExcerpt(segment_id=segment.id, precision="word",
-                                                  start=matches[0][0], end=matches[-1][1],
-                                                  text="".join(text for _, _, text in matches).strip()))
-            else:
-                a, b = round(segment.start + offset, 3), round(segment.end + offset, 3)
-                if a < end and b > start and segment.text:
-                    excerpts.append(SpeechExcerpt(segment_id=segment.id, precision="segment",
-                                                  start=a, end=b, text=segment.text))
+                                                  start=matches[0].start, end=matches[-1].end,
+                                                  text="".join(word.text for word in matches).strip()))
+            elif segment.start < end and segment.end > start and segment.text:
+                excerpts.append(SpeechExcerpt(segment_id=segment.id, precision="segment",
+                                              start=segment.start, end=segment.end, text=segment.text))
         return excerpts
 
-    timeline = []
+    audio = []
     for item in evidence.audio:
         speech = overlapping_speech(item.start, item.end)
         item.transcript_ids = [excerpt.segment_id for excerpt in speech]
         kind = "quiet" if "quiet_seconds" in item.metrics else "pace"
-        timeline.append(ReportMoment(start=item.start, end=item.end, kind=kind, metrics=item.metrics, speech=speech))
-    if evidence.visual:
-        for window in evidence.visual.windows:
-            window.transcript_ids = [excerpt.segment_id for excerpt in overlapping_speech(window.start, window.end)]
-        for event in evidence.visual.events:
-            speech = overlapping_speech(event.start, event.end)
-            event.transcript_ids = [excerpt.segment_id for excerpt in speech]
-            timeline.append(ReportMoment(start=event.start, end=event.end, kind=event.kind,
-                                         metrics=event.metrics, speech=speech))
-    return DeliveryReport(timeline=sorted(timeline, key=lambda item: (item.start, item.end, item.kind)))
+        audio.append(ReportMoment(id=item.id, start=item.start, end=item.end, kind=kind, metrics=item.metrics, speech=speech))
+
+    video = []
+    if visual:
+        for item in [*visual.windows, *visual.events]:
+            start = round(item.start + video_in_audio, 6)
+            end = round(item.end + video_in_audio, 6)
+            speech = overlapping_speech(start, end)
+            item.transcript_ids = [excerpt.segment_id for excerpt in speech]
+        for event in visual.events:
+            start = round(event.start + video_in_audio, 6)
+            end = round(event.end + video_in_audio, 6)
+            links = [item.id for item in [*evidence.audio, *evidence.audio_levels]
+                     if item.start < end and item.end > start]
+            video.append(ReportMoment(id=event.id, start=event.start, end=event.end, kind=event.kind,
+                                      metrics=event.metrics, measurements=event.measurements,
+                                      speech=overlapping_speech(start, end), audio_refs=links))
+
+    return DeliveryReport(
+        sync=TimelineSync(audio_to_playback_seconds=audio_shift, video_to_playback_seconds=video_shift),
+        video=video, audio=audio, audio_levels=evidence.audio_levels, transcript=transcript,
+    )

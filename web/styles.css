@@ -834,6 +834,20 @@ progress {
   margin-right: 10px;
   font-variant-numeric: tabular-nums;
 }
+.presenter-ranges {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+}
+.presenter-ranges input {
+  width: min(100%, 360px);
+  padding: 7px 9px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
 .segment-row .review-time {
   font: inherit;
   padding: 2px 1px;
