@@ -83,7 +83,7 @@ class SpeechExcerpt(BaseModel):
     start: float
     end: float
     text: str
-    precision: Literal["word", "segment"]
+    precision: Literal["segment"] = "segment"
 
 
 class ReportMoment(BaseModel):

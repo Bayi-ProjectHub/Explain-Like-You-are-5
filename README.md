@@ -39,7 +39,7 @@ uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 
 启动服务后打开 http://127.0.0.1:8000/app/
 
-当前用户端流程：**中英抽题、计时准备、上传讲解视频、转写、提取表达证据、查看和下载结果**。报告提供独立的画面和声音时间轴、词级转写关联、回看、Markdown 和证据 JSON。练习报告在本地生成。
+当前用户端流程：**中英抽题、计时准备、上传讲解视频、转写、提取表达证据、查看和下载结果**。报告提供独立的画面和声音时间轴、分句转写关联、回看、Markdown 和证据 JSON。练习报告在本地生成。
 
 - 词库包含 36 个中英配对概念、6 个领域、3 档难度。界面语言与讲解语言可分别选择。
 - 支持 MP4、MOV、WebM、MKV、M4V；默认上限 200 MB、音轨 10 分钟。媒体处理复用已有 PyAV，不需要另外安装 ffmpeg 命令。
@@ -65,7 +65,7 @@ curl -s -F "file=@demo.wav" -F "language=zh" http://127.0.0.1:8000/audio/transcr
 # 2. 轮询任务
 curl -s http://127.0.0.1:8000/audio/transcriptions/<task_id>
 # status: queued | processing | completed | failed
-# completed 时 result 包含 text、language、duration 和带起止时间的 segments 和词级 words
+# completed 时 result 包含 text、language、duration 和带起止时间的 segments
 ```
 
 运行参数在 `src/config.py` 中，通过环境变量配置（`WHISPER_MODEL` 默认 `small`、`WHISPER_DEVICE`、`WHISPER_COMPUTE_TYPE` 等）。本地验证：`uv run pytest`。

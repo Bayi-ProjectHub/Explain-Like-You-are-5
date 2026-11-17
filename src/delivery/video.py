@@ -18,6 +18,7 @@ SAMPLE_HZ = 15.0
 MAX_FRAME_GAP = 0.28
 WINDOW_SECONDS = 2.0
 GESTURE_SPEED_THRESHOLD = 0.6  # Shoulder widths per second; an initial heuristic.
+MIN_GESTURE_SECONDS = 0.12       # Discard single-sample wrist jumps at the target rate.
 # Only report changes in movement-related coefficients. They are not emotions.
 FACE_COEFFICIENTS = {"browInnerUp", "eyeBlinkLeft", "eyeBlinkRight", "jawOpen",
                      "mouthSmileLeft", "mouthSmileRight"}
@@ -246,8 +247,14 @@ def directional_events(frames: list[FrameSignals]) -> list[VisualEvent]:
             event = VisualEvent(id="", kind=kind, start=start, end=end, metrics={}, measurements=[measurement])
             events.append(event)
             active[key] = event
+    return [event for event in events if significant_motion(event)]
+
+
+def significant_motion(event: VisualEvent) -> bool:
+    if event.kind == "gesture" and round(event.end - event.start, 3) < MIN_GESTURE_SECONDS:
+        return False
     minimum_span = {"degree": 2.0, "shoulder_width": 0.08, "blendshape_coefficient": 0.16}
-    return [event for event in events if event.measurements[0].span >= minimum_span[event.measurements[0].unit]]
+    return all(m.span >= minimum_span[m.unit] for m in event.measurements)
 
 
 def analyze_video(path: Path, model_path: Path, max_seconds: int,

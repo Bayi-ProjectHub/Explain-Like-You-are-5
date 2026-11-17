@@ -2,6 +2,7 @@
 
 from contextlib import ExitStack
 from math import hypot
+import os
 from pathlib import Path
 
 
@@ -35,6 +36,9 @@ class LandmarkFallbacks:
         self.hand = stack.enter_context(vision.HandLandmarker.create_from_options(
             vision.HandLandmarkerOptions(base_options=base(hand_path), num_hands=2)
         )) if hand_path.is_file() else None
+        self.face_mode = os.environ.get("VIDEO_FACE_MODE", "adaptive")
+        if self.face_mode not in {"adaptive", "dedicated"}:
+            raise ValueError("VIDEO_FACE_MODE must be adaptive or dedicated.")
 
     def fill(self, image, result, timestamp_ms: int) -> set[str]:
         used = set()
@@ -45,7 +49,8 @@ class LandmarkFallbacks:
             if fallback.pose_landmarks and pose_quality(fallback.pose_landmarks[0]) > primary_quality:
                 result.pose_landmarks = fallback.pose_landmarks[0]
                 used.add("pose_heavy")
-        if self.face:
+        has_face = len(result.face_landmarks) >= 478 and bool(result.face_blendshapes)
+        if self.face and (self.face_mode == "dedicated" or not has_face):
             fallback = self.face.detect_for_video(image, timestamp_ms)
             if fallback.face_landmarks:
                 result.face_landmarks = fallback.face_landmarks[0]

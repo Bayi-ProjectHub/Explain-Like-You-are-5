@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ..audio.schemas import TaskStatus, TranscriptionResult
 from ..audio.service import AudioTooLargeError, TaskNotFoundError, TranscriptionService
 from ..delivery.audio import analyze_audio
+from ..delivery.clock import audio_playback_offset
 from ..delivery.report import build_delivery_report
 from ..delivery.schemas import DeliveryEvidence, DeliveryReport, PlaybackRange
 from ..delivery.video import analyze_video
@@ -104,7 +105,8 @@ class PracticeService:
         try:
             async with self._worker:
                 self._update(task_id, status="extracting")
-                audio_offset = await asyncio.to_thread(extract_audio, video_path, audio_path, self._max_seconds)
+                await asyncio.to_thread(extract_audio, video_path, audio_path, self._max_seconds)
+                audio_offset = await asyncio.to_thread(audio_playback_offset, video_path)
                 self._update(task_id, status="transcribing")
                 task = self.get(task_id)
                 with audio_path.open("rb") as audio_file:

@@ -11,8 +11,9 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from src.audio.schemas import Segment, TimedWord, TranscriptionResult
+from src.audio.schemas import Segment, TranscriptionResult
 from src.audio.service import TranscriptionService
+from src.delivery.clock import audio_playback_offset
 from src.delivery.schemas import Evidence, VisualEvent, VisualEvidence
 from src.practice.media import MediaError, extract_audio
 from src.practice.service import PracticeService
@@ -190,10 +191,10 @@ def test_product_page_and_existing_root_remain_available(client):
     assert client.get("/app/styles.css").status_code == 200
 
 
-def test_extract_audio_reports_offset_in_original_playback(tmp_path):
-    video, audio = tmp_path / "offset.mkv", tmp_path / "offset.wav"
+def test_video_sync_reads_audio_offset_without_changing_transcription(tmp_path):
+    video = tmp_path / "offset.mkv"
     video.write_bytes(make_video(audio_start=4000))
-    assert extract_audio(video, audio, max_seconds=2) == pytest.approx(0.25, abs=0.002)
+    assert audio_playback_offset(video) == pytest.approx(0.25, abs=0.002)
 
 
 def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, monkeypatch):
@@ -209,10 +210,7 @@ def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, m
 
     def transcribe(path, language):
         return TranscriptionResult(text="First example.", language=language, duration=1, segments=[
-            Segment(id=0, start=0, end=1, text="First example.", words=[
-                TimedWord(start=0.1, end=0.2, text=" First"),
-                TimedWord(start=0.75, end=0.9, text=" example."),
-            ]),
+            Segment(id=0, start=0.05, end=0.96, text="First example."),
         ])
 
     monkeypatch.setattr("src.practice.service.analyze_video", visual_analysis)
@@ -232,12 +230,10 @@ def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, m
     report = task["delivery_report"]
     assert report["sync"] == {"audio_to_playback_seconds": 0.25, "video_to_playback_seconds": 0.1}
     assert [item["start"] for item in report["video"]] == [0.25, 0.89]
-    assert report["video"][0]["speech"] == [
-        {"segment_id": 0, "start": 0.1, "end": 0.2, "text": "First", "precision": "word"},
-    ]
-    assert report["video"][1]["speech"] == [
-        {"segment_id": 0, "start": 0.75, "end": 0.9, "text": "example.", "precision": "word"},
-    ]
+    for event in report["video"]:
+        assert event["speech"] == [
+            {"segment_id": 0, "start": 0.05, "end": 0.96, "text": "First example.", "precision": "segment"},
+        ]
     assert report["audio"][0]["start"] == 0.2
     assert report["audio"][0]["metrics"] == {"quiet_seconds": 0.6}
     assert report["video"][0]["audio_refs"] == ["A1", "L1"]

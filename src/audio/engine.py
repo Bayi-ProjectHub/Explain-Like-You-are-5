@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Protocol
 
-from .schemas import Segment, TimedWord, TranscriptionResult
+from .schemas import Segment, TranscriptionResult
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,6 @@ class FasterWhisperTranscriber:
             str(audio_path),
             language=language,
             vad_filter=True,
-            word_timestamps=True,
         )
         raw_segments = list(segment_iter)
         segments = [
@@ -73,8 +72,6 @@ class FasterWhisperTranscriber:
                 start=round(segment.start, 2),
                 end=round(segment.end, 2),
                 text=segment.text.strip(),
-                words=[TimedWord(start=word.start, end=word.end, text=word.word)
-                       for word in (segment.words or []) if word.start < word.end and word.word.strip()],
             )
             for index, segment in enumerate(raw_segments)
         ]

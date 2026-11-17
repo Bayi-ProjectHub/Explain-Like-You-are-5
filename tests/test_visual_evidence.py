@@ -32,19 +32,26 @@ def test_missing_hands_and_gaps_do_not_create_gesture_counts():
 
 def test_visual_events_follow_frame_timestamps_across_window_boundary():
     frames = [FrameSignals(t, wrists={"left": (x, 0.0)}) for t, x in
-              [(1.9, 0), (2.0, 0.2), (2.1, 0.4), (2.2, 0.4), (2.3, 0.6)]]
+              [(1.9, 0), (2.0, 0.2), (2.1, 0.4), (2.2, 0.4), (2.3, 0.6), (2.4, 0.8)]]
     events = detect_visual_events(frames)
-    assert [(event.start, event.end) for event in events] == [(1.9, 2.1), (2.2, 2.3)]
+    assert [(event.start, event.end) for event in events] == [(1.9, 2.1), (2.2, 2.4)]
 
 
 def test_wrist_lift_and_lowering_have_signed_measurements_and_stop_at_a_cut():
     frames = [FrameSignals(time, wrists={"right": (0.2, y)}, scene_cut=cut) for time, y, cut in
-              [(0.0, 0.5, False), (0.1, 0.3, False), (0.2, 0.1, False), (0.3, 0.35, False), (0.4, 0.8, True)]]
+              [(0.0, 0.5, False), (0.1, 0.3, False), (0.2, 0.1, False), (0.3, 0.35, False),
+               (0.4, 0.5, False), (0.5, 0.8, True)]]
     lift, lower = detect_visual_events(frames)
-    assert (lift.start, lift.end, lower.start, lower.end) == (0.0, 0.2, 0.2, 0.3)
+    assert (lift.start, lift.end, lower.start, lower.end) == (0.0, 0.2, 0.2, 0.4)
     first = lift.measurements[0]
     assert (first.target, first.axis, first.unit, first.delta) == ("right_wrist", "y", "shoulder_width", -0.4)
-    assert (lower.measurements[0].start_value, lower.measurements[0].end_value) == (0.1, 0.35)
+    assert (lower.measurements[0].start_value, lower.measurements[0].end_value) == (0.1, 0.5)
+
+
+def test_single_frame_wrist_jump_is_not_a_gesture():
+    before = FrameSignals(111.695, wrists={"left": (0.0, 0.3634)})
+    after = FrameSignals(111.737, wrists={"left": (0.0, 0.2081)})
+    assert detect_visual_events([before, after]) == []
 
 
 def test_face_coefficients_are_named_and_model_switch_is_not_an_action():

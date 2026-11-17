@@ -605,17 +605,10 @@ function renderResult(task) {
     time.className = "segment-time";
     time.textContent = `${preciseTime(segment.start + audioOffset)}–${preciseTime(segment.end + audioOffset)}`;
     const text = document.createElement("p");
-    if (videoUrl && segment.words?.length) {
-      for (const word of segment.words) {
-        const start = word.start + audioOffset;
-        const token = word.text.trim();
-        if (word.text.startsWith(" ")) text.append(" ");
-        text.append(reviewAt(start, `${token} · ${preciseTime(start)}`, token));
-      }
-    } else {
-      text.textContent = segment.text;
-    }
-    row.append(time, text);
+    text.textContent = segment.text;
+    if (videoUrl) row.append(reviewAt(segment.start + audioOffset,
+      words(`回看 ${time.textContent}`, `Review ${time.textContent}`), time.textContent), text);
+    else row.append(time, text);
     $("segments").append(row);
   }
   if (!task.result.segments?.length)

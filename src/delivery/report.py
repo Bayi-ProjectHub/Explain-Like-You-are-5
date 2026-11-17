@@ -11,18 +11,8 @@ def build_delivery_report(evidence: DeliveryEvidence, transcript: TranscriptionR
     video_in_audio = round(video_shift - audio_shift, 6)
 
     def overlapping_speech(start: float, end: float) -> list[SpeechExcerpt]:
-        excerpts = []
-        for segment in transcript.segments:
-            if segment.words:
-                matches = [word for word in segment.words if word.start < end and word.end > start]
-                if matches:
-                    excerpts.append(SpeechExcerpt(segment_id=segment.id, precision="word",
-                                                  start=matches[0].start, end=matches[-1].end,
-                                                  text="".join(word.text for word in matches).strip()))
-            elif segment.start < end and segment.end > start and segment.text:
-                excerpts.append(SpeechExcerpt(segment_id=segment.id, precision="segment",
-                                              start=segment.start, end=segment.end, text=segment.text))
-        return excerpts
+        return [SpeechExcerpt(segment_id=segment.id, start=segment.start, end=segment.end, text=segment.text)
+                for segment in transcript.segments if segment.start < end and segment.end > start and segment.text]
 
     audio = []
     for item in evidence.audio:

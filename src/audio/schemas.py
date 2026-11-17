@@ -11,12 +11,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-class TimedWord(BaseModel):
-    start: float
-    end: float
-    text: str
-
-
 class Segment(BaseModel):
     """一个分句（whisper 的 segment），时间单位是秒。"""
 
@@ -24,7 +18,6 @@ class Segment(BaseModel):
     start: float
     end: float
     text: str
-    words: list[TimedWord] = Field(default_factory=list)
 
 
 class TranscriptionResult(BaseModel):
