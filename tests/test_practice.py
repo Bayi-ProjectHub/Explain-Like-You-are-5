@@ -13,6 +13,8 @@ from fastapi.testclient import TestClient
 
 from src.audio.schemas import Segment, TranscriptionResult
 from src.audio.service import TranscriptionService
+from src.delivery.clock import audio_playback_offset
+from src.delivery.schemas import Evidence, VisualEvent, VisualEvidence
 from src.practice.media import MediaError, extract_audio
 from src.practice.service import PracticeService
 from src.practice.vocabulary import load_vocabulary
@@ -42,7 +44,7 @@ class RecordingTranscriber:
         )
 
 
-def make_video(*, with_audio=True, with_video=True) -> bytes:
+def make_video(*, with_audio=True, with_video=True, with_voice=False, audio_start=0) -> bytes:
     """用已有 PyAV 生成 1 秒媒体，无需安装独立 ffmpeg。"""
     output = BytesIO()
     with av.open(output, mode="w", format="matroska") as container:
@@ -63,9 +65,13 @@ def make_video(*, with_audio=True, with_video=True) -> bytes:
             for packet in video.encode(None):
                 container.mux(packet)
         if with_audio:
-            frame = av.AudioFrame.from_ndarray(np.zeros((1, 16000), dtype=np.int16), format="s16", layout="mono")
+            samples = np.zeros((1, 16000), dtype=np.int16)
+            if with_voice:
+                samples[:, :3200] = 8000
+                samples[:, -3200:] = 8000
+            frame = av.AudioFrame.from_ndarray(samples, format="s16", layout="mono")
             frame.sample_rate = 16000
-            frame.pts = 0
+            frame.pts = audio_start
             frame.time_base = Fraction(1, 16000)
             for packet in audio.encode(frame):
                 container.mux(packet)
@@ -183,3 +189,78 @@ def test_product_page_and_existing_root_remain_available(client):
     assert "讲解师" in response.text
     assert client.get("/app/app.js").status_code == 200
     assert client.get("/app/styles.css").status_code == 200
+
+
+def test_video_sync_reads_audio_offset_without_changing_transcription(tmp_path):
+    video = tmp_path / "offset.mkv"
+    video.write_bytes(make_video(audio_start=4000))
+    assert audio_playback_offset(video) == pytest.approx(0.25, abs=0.002)
+
+
+def test_local_report_aligns_two_events_in_the_same_sentence(client, tmp_path, monkeypatch):
+    def visual_analysis(path, model_path, max_seconds, ranges):
+        assert path.is_file()
+        assert [(r.start, r.end) for r in ranges] == [(0.35, 0.55), (0.9, 1.1)]
+        return VisualEvidence(sample_hz=15, video_offset_seconds=0.1, coverage={"hands": 1}, windows=[], events=[
+            VisualEvent(id="E1", kind="gesture", start=0.25, end=0.36,
+                        metrics={"wrist_speed_shoulder_widths_per_second": 1}),
+            VisualEvent(id="E2", kind="gesture", start=0.89, end=1.0,
+                        metrics={"wrist_speed_shoulder_widths_per_second": 1.2}),
+        ])
+
+    def transcribe(path, language):
+        return TranscriptionResult(text="First example.", language=language, duration=1, segments=[
+            Segment(id=0, start=0.05, end=0.96, text="First example."),
+        ])
+
+    monkeypatch.setattr("src.practice.service.analyze_video", visual_analysis)
+    monkeypatch.setattr(client.engine, "transcribe", transcribe)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "unused")
+    monkeypatch.setenv("DELIVERY_REPORT_ENABLED", "true")
+    app.state.practice_service = PracticeService(
+        TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
+        video_model_path=tmp_path / "test.task",
+    )
+    response = submit(client, make_video(with_voice=True, audio_start=4000),
+                      presenter_ranges='[{"start":0.35,"end":0.55},{"start":0.9,"end":1.1}]')
+    task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
+    assert task["status"] == "completed"
+    assert task["modules"]["delivery_report"]["status"] == "completed"
+    assert task["delivery_evidence"]["audio_offset_seconds"] == 0.25
+    report = task["delivery_report"]
+    assert report["sync"] == {"audio_to_playback_seconds": 0.25, "video_to_playback_seconds": 0.1}
+    assert [item["start"] for item in report["video"]] == [0.25, 0.89]
+    for event in report["video"]:
+        assert event["speech"] == [
+            {"segment_id": 0, "start": 0.05, "end": 0.96, "text": "First example.", "precision": "segment"},
+        ]
+    assert report["audio"][0]["start"] == 0.2
+    assert report["audio"][0]["metrics"] == {"quiet_seconds": 0.6}
+    assert report["video"][0]["audio_refs"] == ["A1", "L1"]
+    assert report["audio_levels"][0]["start"] == 0
+    assert report["audio_levels"][0]["end"] == 1
+    assert not list(tmp_path.rglob("*.mkv"))
+    assert not list(tmp_path.rglob("*.wav"))
+
+
+def test_reject_overlapping_presenter_ranges(client):
+    response = submit(client, presenter_ranges='[{"start":1,"end":3},{"start":2,"end":4}]')
+    assert response.status_code == 422
+
+
+def test_vision_failure_preserves_audio_and_transcript(client, tmp_path, monkeypatch):
+    def missing_model(*args):
+        raise FileNotFoundError("test.task")
+
+    monkeypatch.setattr("src.practice.service.analyze_video", missing_model)
+    app.state.practice_service = PracticeService(
+        TranscriptionService(client.engine, tmp_path / "audio", 1), tmp_path / "practice", 1,
+        video_model_path=tmp_path / "test.task",
+    )
+    response = submit(client, make_video(with_voice=True))
+    task = client.get(f"/practice/submissions/{response.json()['task_id']}").json()
+    assert task["status"] == "completed"
+    assert task["modules"]["video_evaluation"]["status"] == "failed"
+    assert task["result"]["text"]
+    assert task["delivery_evidence"]["visual"] is None
+    assert task["delivery_evidence"]["audio"][0]["transcript_ids"] == [0]

@@ -1,14 +1,17 @@
 """词库查询、随机抽题和用户练习的 HTTP 接口。"""
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
+from pydantic import TypeAdapter, ValidationError
 
 from ..audio.service import AudioTooLargeError, TaskNotFoundError
 from ..config import load_settings
+from ..delivery.schemas import PlaybackRange
 from .media import MediaError
 from .service import PracticeTask
 from .vocabulary import Difficulty, Language, draw_term, filter_terms, find_term, load_vocabulary
 
 router = APIRouter(prefix="/practice", tags=["practice"])
+presenter_range_array = TypeAdapter(list[PlaybackRange])
 
 
 @router.get("/vocabulary")
@@ -37,13 +40,20 @@ async def random_term(
 async def create_submission(
     request: Request, background_tasks: BackgroundTasks,
     file: UploadFile = File(...), term_id: str = Form(...), language: Language = Form(...),
+    presenter_ranges: str = Form("[]", max_length=12000),
 ):
     term = find_term(term_id)
     if term is None:
         raise HTTPException(status_code=422, detail="术语不存在，请重新抽题。")
     service = request.app.state.practice_service
     try:
-        task = await service.submit(file, term, language)
+        try:
+            ranges = sorted(presenter_range_array.validate_json(presenter_ranges), key=lambda item: item.start)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="讲者时段格式不正确。") from exc
+        if len(ranges) > 100 or any(b.start < a.end for a, b in zip(ranges, ranges[1:])):
+            raise HTTPException(status_code=422, detail="讲者时段不得重叠，最多 100 段。")
+        task = await service.submit(file, term, language, ranges)
     except MediaError as exc:
         raise HTTPException(status_code=415, detail=str(exc)) from exc
     except AudioTooLargeError as exc:

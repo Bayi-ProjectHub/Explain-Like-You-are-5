@@ -39,13 +39,19 @@ uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 
 启动服务后打开 http://127.0.0.1:8000/app/
 
-当前用户端流程：**中英词库筛选与随机抽题 → 准备计时与笔记 → 上传讲解视频 → 音轨提取与实际转写状态 → 完整文本／时间片段／结果下载**。
+从中英词库抽题后，可以计时准备，再上传讲解视频。服务在本地完成转写并生成报告。画面和声音各有时间轴，动作旁会标出当时的转写。点击时间可以回看，也可以下载 Markdown 报告或证据 JSON。
 
 - 词库包含 36 个中英配对概念、6 个领域、3 档难度。界面语言与讲解语言可分别选择。
 - 支持 MP4、MOV、WebM、MKV、M4V；默认上限 200 MB、音轨 10 分钟。媒体处理复用已有 PyAV，不需要另外安装 ffmpeg 命令。
 - 任务存在进程内存里，运行时使用单 worker；重启服务会丢失任务。当前浏览器会话保留题目、准备笔记及已取得的结果，刷新时可继续查询已提交的任务。
 
 词库维护、产品接口与后续模块整合见 [docs/PRODUCT.md](docs/PRODUCT.md)。页面由现有 FastAPI 服务提供。
+
+### 启用画面分析
+
+运行 `uv sync --locked --extra video` 安装视频依赖。下载模型后，把文件路径填到 `.env` 的 `VIDEO_MODEL_PATH`。[MediaPipe Holistic 模型](https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task)
+
+完整安装命令、报告字段和验证方法见 [交接文档](docs/DELIVERY_HANDOFF.md)。
 
 ### 音频转写接口
 

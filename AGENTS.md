@@ -47,11 +47,11 @@ Implemented in `src/evaluation/`:
 
 - `web/` — 同源静态用户端，入口 `/app/`，使用原生 HTML/CSS/JS，无额外构建依赖。原来的 `/` JSON 健康响应及 `/audio/*` 接口保持兼容。
 - `src/practice/vocabulary.json` — 36 个中英配对概念，6 类领域、3 档难度；`vocabulary.py` 负责加载校验与随机抽题。
-- `src/practice/media.py` — 用已有 PyAV 从视频中提取单声道 16 kHz WAV；不分析画面，不更改音频模块支持的格式。
-- `src/practice/service.py` — 独立练习编排，调用已有 `TranscriptionService`；视频任务逐个处理，状态为 `queued | extracting | transcribing | completed | failed`。`completed` 仅表示当前音轨提取与转写已完成，不表示评价已完成。
+- `src/practice/media.py` 用 PyAV 提取单声道 16 kHz WAV。`src/delivery/clock.py` 单独读取音轨起点，供报告换算时间。
+- `src/practice/service.py` 先调用 `TranscriptionService` 转写，再把画面动作和声音记录写进本地报告。任务逐个处理，状态为 `queued | extracting | transcribing | analyzing_delivery | completed | failed`。看到 `completed` 就可以读取转写。画面分析等步骤的结果在 `modules` 里。
 - `src/practice/router.py` — `GET /practice/vocabulary`、`GET /practice/terms/random`、`POST /practice/submissions`、`GET /practice/submissions/{task_id}`。
 - 追加配置 `MAX_VIDEO_SECONDS`（默认 600，限制解码音轨长度），复用 `MAX_UPLOAD_MB`。正常完成和失败均删除视频及生成的临时音轨。
-- 文本评价与视频评价均为 `pending`，尚无评分、建议或画面分析。后续整合入口和接口约定见 `docs/PRODUCT.md`。
+- 配好模型后，`src/delivery/video.py` 用 MediaPipe 记录面部动作、头眼朝向和身体动作。`src/delivery/audio.py` 用已有 WAV 算电平，按转写分句估算语速。`src/delivery/report.py` 保留两条时间轴，按重叠时段把画面动作连到声音和转写。文本评分可单独调用 `POST /evaluations`。[视频模块交接](docs/DELIVERY_HANDOFF.md)
 - 任务记录仍为进程内存，仅支持单 worker；服务重启丢任务。页面使用 `sessionStorage` 保存当前练习，文件需重新选择，不保存原视频。
 - 测试：`tests/test_practice.py` 使用 PyAV 生成真实容器验证媒体提取，用假引擎测试转写编排；这不等于真实模型准确率验证。真实模型验证需另外记录使用的模型和视频来源。
 

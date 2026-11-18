@@ -34,9 +34,11 @@ class Settings:
     max_upload_mb: int
     # 用户端视频的音轨时长上限，默认 10 分钟
     max_video_seconds: int = 600
+    video_model_path: Path | None = None
 
 
 def load_settings() -> Settings:
+    video_model_path = os.environ.get("VIDEO_MODEL_PATH")
     return Settings(
         whisper_model=_env("WHISPER_MODEL", "small"),
         whisper_device=_env("WHISPER_DEVICE", "cpu"),
@@ -44,4 +46,5 @@ def load_settings() -> Settings:
         upload_dir=Path(_env("UPLOAD_DIR", str(PROJECT_ROOT / "data" / "uploads"))),
         max_upload_mb=int(_env("MAX_UPLOAD_MB", "200")),
         max_video_seconds=int(_env("MAX_VIDEO_SECONDS", "600")),
+        video_model_path=Path(video_model_path) if video_model_path else None,
     )
