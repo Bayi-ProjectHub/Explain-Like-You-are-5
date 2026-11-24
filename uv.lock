@@ -494,13 +494,9 @@ dependencies = [
     { name = "av" },
     { name = "fastapi", extra = ["standard"] },
     { name = "faster-whisper" },
+    { name = "mediapipe" },
     { name = "numpy" },
     { name = "openai" },
-]
-
-[package.optional-dependencies]
-video = [
-    { name = "mediapipe" },
 ]
 
 [package.dev-dependencies]
@@ -513,11 +509,10 @@ requires-dist = [
     { name = "av", specifier = ">=11,<19" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.162.0" },
     { name = "faster-whisper", specifier = ">=1.2.0,<2" },
-    { name = "mediapipe", marker = "extra == 'video'", specifier = ">=1.2.3,<2" },
+    { name = "mediapipe", specifier = ">=1.2.3,<2" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "openai", specifier = ">=3.51.0" },
 ]
-provides-extras = ["video"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.0" }]

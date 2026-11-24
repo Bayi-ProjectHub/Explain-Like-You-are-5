@@ -8,12 +8,10 @@ dependencies = [
     "av>=11,<19",  # faster-whisper 1.2.1 仍调用 av.open(metadata_errors=...)，av 19 移除了该参数
     "fastapi[standard]>=0.162.0",
     "faster-whisper>=1.2.0,<2",
+    "mediapipe>=1.2.3,<2",
     "numpy>=2.5.4",
     "openai>=3.51.0",
 ]
-
-[project.optional-dependencies]
-video = ["mediapipe>=1.2.3,<2"]
 
 [dependency-groups]
 dev = [

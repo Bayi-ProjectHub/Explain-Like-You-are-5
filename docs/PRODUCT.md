@@ -89,7 +89,7 @@ curl http://127.0.0.1:8000/practice/submissions/TASK_ID
 
 `delivery_evidence` 保存画面统计、声音记录和音轨偏移。`delivery_report` 里的画面和声音各用自己的时间轴，`result.segments` 使用音轨时间。需要跳到播放器时，给轨道时间加上 `delivery_report.sync` 里的对应偏移。
 
-上传时可指定讲者出镜范围。服务只分析选中的画面，整段声音仍会转写。任务结束后会清理临时视频和 WAV。文本评分可单独调用 `POST /evaluations`。报告字段、运行条件和待校准的问题见 [交接文档](DELIVERY_HANDOFF.md)。
+上传时可指定讲者出镜范围。服务只分析选中的画面，整段声音仍会转写。任务结束后会清理临时视频和 WAV。文本评分可单独调用 `POST /evaluations`。运行环境与命令见 [README](../README.md)，报告字段、测量含义、实测数据与待校准问题见 [AGENTS.md](../AGENTS.md)。
 
 ## 验证与边界
 
@@ -101,5 +101,5 @@ node --check web/app.js  # 可选的 JavaScript 语法检查；运行网页本�
 - 单元／接口测试使用真实 PyAV 媒体容器、假转写引擎：验证筛选、双语、避免连续重复、音轨提取、排队提交与查询、失败状态、上传限制、文件清理、已有路由兼容。
 - 2026-11-15 本地验证：20 passed、1 skipped。另使用 macOS 合成语音制作中英 MP4，以真实 `base` 模型通过浏览器跑通上传到结果的流程，并验证英文结果下载。合成语音短样本只能验证流程，不能代表真人讲解的识别准确率或评价质量。
 - 浏览器人工验证覆盖中英切换、筛选、准备暂停与刷新恢复、视频预览与提交、损坏视频失败后重新选择并成功重试、结果与时间片段切换、结果下载、390px 手机宽度布局。验证产物位于未追踪的 `data/qa/`，不作为产品样本发布。
-- 画面分析需要安装可选的 `video` 依赖组。音视频解码用已有的 `av`，无需另外安装 ffmpeg。页面使用原生 HTML、CSS 和 JavaScript。
+- 画面分析使用随 `uv sync` 安装的 MediaPipe 和 `scripts/download_models.py` 下载的模型。音视频解码用已有的 `av`，无需另外安装 ffmpeg。页面使用原生 HTML、CSS 和 JavaScript。
 - 当前服务仅用于小规模本地开发，使用单 worker。任务存在内存中，重启丢失；没有持久队列、跨进程共享状态、自动历史清理和远程部署。

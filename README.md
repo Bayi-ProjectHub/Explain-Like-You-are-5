@@ -32,8 +32,10 @@ In this process, while expanding and deepening users' knowledge, it would effect
 
 ```bash
 cp .env.example .env # 仅第一次启动执行即可
+uv run python scripts/download_models.py # 下载画面分析模型，已存在时跳过
 uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 ```
+脚本默认只下载必需的 Holistic 模型
 
 ### 用户端练习页面
 
@@ -47,11 +49,21 @@ uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 
 词库维护、产品接口与后续模块整合见 [docs/PRODUCT.md](docs/PRODUCT.md)。页面由现有 FastAPI 服务提供。
 
-### 启用画面分析
+### 完整视频分析接口
 
-运行 `uv sync --locked --extra video` 安装视频依赖。下载模型后，把文件路径填到 `.env` 的 `VIDEO_MODEL_PATH`。[MediaPipe Holistic 模型](https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task)
+上传讲解视频时使用 multipart 表单：`file`、`term_id`、`language` 必填。可选的 `presenter_ranges` 指定讲者出镜时段，只影响画面分析；声音和转写仍覆盖整段视频。
 
-完整安装命令、报告字段和验证方法见 [交接文档](docs/DELIVERY_HANDOFF.md)。
+```bash
+# 提交任务，立即返回 202 和 task_id
+curl -F 'file=@explanation.mp4' -F 'term_id=goodharts-law' -F 'language=zh' \
+  -F 'presenter_ranges=[{"start":5,"end":28},{"start":35,"end":70}]' \
+  http://127.0.0.1:8000/practice/submissions
+
+# 轮询任务，完成后读取 result、modules 和 delivery_report
+curl http://127.0.0.1:8000/practice/submissions/<task_id>
+```
+
+完整的请求字段、错误码和词库维护见 [PRODUCT.md](docs/PRODUCT.md)；测量含义、实测数据与已知限制见 [AGENTS.md](AGENTS.md#delivery-analysis-module)。
 
 ### 音频转写接口
 
@@ -90,3 +102,11 @@ curl -s -X POST http://127.0.0.1:8000/evaluations \
 ```
 
 返回 `knowledge`（准确、完整、逻辑、深度、例子）与 `speaking`（清晰、连贯、简洁、结构）九个维度的分数、理由、原文证据和改进建议，以及 `knowledge_score`、`speaking_score`、`overall_score`。只做文本分析，不评价发音、语速、表情等。
+
+### 测试
+
+```bash
+uv run pytest -q                            # 单元与接口测试（假引擎，不下载模型）
+RUN_INTEGRATION=1 uv run pytest -m integration  # 真实 Whisper 模型，需联网，首次下载权重
+node --check web/app.js                     # 可选，仅检查前端语法，运行网页本身不需要 Node
+```
