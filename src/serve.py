@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI):
     app.state.practice_service = PracticeService(
         app.state.transcription_service, settings.upload_dir / "practice",
         settings.max_upload_mb, settings.max_video_seconds,
+        video_model_path=settings.video_model_path,
     )
     logger.info("音频转写模块就绪（模型 %s）", settings.whisper_model)
     yield

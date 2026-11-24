@@ -298,6 +298,13 @@
             <p class="quiet upload-tip" data-i18n="uploadTip">
               找一个安静的地方，确认人声清楚。视频在处理结束后会从服务器删除。
             </p>
+            <label class="presenter-ranges" for="presenter-ranges">
+              <span data-i18n="presenterRanges">讲者出镜时段（可选）</span>
+              <input id="presenter-ranges" type="text" placeholder="00:05–00:28, 00:35–01:10" aria-describedby="presenter-ranges-help">
+            </label>
+            <p id="presenter-ranges-help" class="quiet small" data-i18n="presenterRangesHelp">
+              有观众切镜时，填讲者出镜的开始和结束时间，用逗号分隔。音频仍分析整段。
+            </p>
           </div>
           <article id="processing" class="processing" aria-live="polite" hidden>
             <div class="processing-top">
@@ -316,6 +323,9 @@
               </li>
               <li data-processing="transcribing" data-i18n="transcribeStage">
                 转写讲解
+              </li>
+              <li data-processing="analyzing_delivery" data-i18n="deliveryStage">
+                分析表达
               </li>
             </ol>
             <div id="reconnect-controls" hidden>
@@ -408,9 +418,10 @@
               hidden
             ></div>
           </article>
+          <video id="result-video" class="result-video" controls playsinline preload="metadata" hidden></video>
           <div id="evaluation-modules" class="evaluation-modules"></div>
           <p class="quiet small" data-i18n="transcriptCaution">
-            转写可能包含识别错误。当前结果展示语音文本，尚未生成内容或表现评价。
+            转写和动作时间为本地估算，可以用原视频核对。
           </p>
           <div class="actions">
             <button
@@ -419,8 +430,9 @@
               type="button"
               data-i18n="downloadResult"
             >
-              ↓ 保存这次结果</button
-            ><button id="practice-again" class="primary" type="button">
+              ↓ 下载视频报告</button>
+            <button id="download-evidence" class="text-button" type="button" data-i18n="downloadEvidence">↓ 导出证据 JSON</button>
+            <button id="practice-again" class="primary" type="button">
               <span data-i18n="practiceAgain">再探索一个概念</span
               ><span aria-hidden="true">↗</span>
             </button>

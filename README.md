@@ -32,20 +32,38 @@ In this process, while expanding and deepening users' knowledge, it would effect
 
 ```bash
 cp .env.example .env # 仅第一次启动执行即可
+uv run python scripts/download_models.py # 下载画面分析模型，已存在时跳过
 uv run uvicorn src.serve:app --reload --env-file .env --port 8000
 ```
+脚本默认只下载必需的 Holistic 模型
 
 ### 用户端练习页面
 
 启动服务后打开 http://127.0.0.1:8000/app/
 
-当前用户端流程：**中英词库筛选与随机抽题 → 准备计时与笔记 → 上传讲解视频 → 音轨提取与实际转写状态 → 完整文本／时间片段／结果下载**。
+从中英词库抽题后，可以计时准备，再上传讲解视频。服务在本地完成转写并生成报告。画面和声音各有时间轴，动作旁会标出当时的转写。点击时间可以回看，也可以下载 Markdown 报告或证据 JSON。
 
 - 词库包含 36 个中英配对概念、6 个领域、3 档难度。界面语言与讲解语言可分别选择。
 - 支持 MP4、MOV、WebM、MKV、M4V；默认上限 200 MB、音轨 10 分钟。媒体处理复用已有 PyAV，不需要另外安装 ffmpeg 命令。
 - 任务存在进程内存里，运行时使用单 worker；重启服务会丢失任务。当前浏览器会话保留题目、准备笔记及已取得的结果，刷新时可继续查询已提交的任务。
 
 词库维护、产品接口与后续模块整合见 [docs/PRODUCT.md](docs/PRODUCT.md)。页面由现有 FastAPI 服务提供。
+
+### 完整视频分析接口
+
+上传讲解视频时使用 multipart 表单：`file`、`term_id`、`language` 必填。可选的 `presenter_ranges` 指定讲者出镜时段，只影响画面分析；声音和转写仍覆盖整段视频。
+
+```bash
+# 提交任务，立即返回 202 和 task_id
+curl -F 'file=@explanation.mp4' -F 'term_id=goodharts-law' -F 'language=zh' \
+  -F 'presenter_ranges=[{"start":5,"end":28},{"start":35,"end":70}]' \
+  http://127.0.0.1:8000/practice/submissions
+
+# 轮询任务，完成后读取 result、modules 和 delivery_report
+curl http://127.0.0.1:8000/practice/submissions/<task_id>
+```
+
+完整的请求字段、错误码和词库维护见 [PRODUCT.md](docs/PRODUCT.md)；测量含义、实测数据与已知限制见 [AGENTS.md](AGENTS.md#delivery-analysis-module)。
 
 ### 音频转写接口
 
@@ -84,3 +102,11 @@ curl -s -X POST http://127.0.0.1:8000/evaluations \
 ```
 
 返回 `knowledge`（准确、完整、逻辑、深度、例子）与 `speaking`（清晰、连贯、简洁、结构）九个维度的分数、理由、原文证据和改进建议，以及 `knowledge_score`、`speaking_score`、`overall_score`。只做文本分析，不评价发音、语速、表情等。
+
+### 测试
+
+```bash
+uv run pytest -q                            # 单元与接口测试（假引擎，不下载模型）
+RUN_INTEGRATION=1 uv run pytest -m integration  # 真实 Whisper 模型，需联网，首次下载权重
+node --check web/app.js                     # 可选，仅检查前端语法，运行网页本身不需要 Node
+```
