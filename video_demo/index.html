@@ -7,7 +7,7 @@
   <title>视频画面分析 · 讲解师</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
-  <script src="./app.js" defer></script>
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -53,17 +53,71 @@
           <dl class="summary">
             <div><dt>采样帧数</dt><dd id="frames"></dd></div>
             <div><dt>动作记录</dt><dd id="event-count"></dd></div>
+            <div><dt>测量时段</dt><dd id="window-count"></dd></div>
           </dl>
-          <div id="observations">
+          <nav class="result-links" aria-label="跳到结果分区">
+            <a href="#events-section">画面动作 ↓</a>
+            <a href="#windows-section">分时段测量 ↓</a>
+            <a href="#technical-section">采样与时间对齐 ↓</a>
+          </nav>
+          <div id="coverage">
             <h3>点位覆盖率</h3>
             <p class="caption">各类点位被识别到的采样帧比例。</p>
-            <ul id="coverage" class="coverage"></ul>
-
-            <h3>画面动作</h3>
-            <p class="caption" id="event-empty" hidden>已分析的画面里没有检测到动作。</p>
-            <ul id="events" class="events" aria-label="画面动作"></ul>
+            <div class="coverage-groups">
+              <div><h4>面部与眼部</h4><ul id="coverage-face" class="coverage"></ul></div>
+              <div><h4>身体姿态</h4><ul id="coverage-body" class="coverage"></ul></div>
+              <div><h4>手和手腕</h4><ul id="coverage-hands" class="coverage"></ul></div>
+            </div>
           </div>
         </div>
+      </section>
+    </div>
+
+    <div id="analysis-details" class="analysis-details" hidden>
+      <section id="events-section" class="panel" aria-labelledby="events-heading">
+        <div class="section-heading">
+          <h2 id="events-heading">画面动作</h2>
+          <div class="inline-field">
+            <label for="event-filter">动作分类</label>
+            <select id="event-filter">
+              <option value="all">全部</option>
+              <option value="face">面部动作</option>
+              <option value="gaze">头眼朝向</option>
+              <option value="posture">身体姿态</option>
+              <option value="gesture">手部动作</option>
+            </select>
+          </div>
+        </div>
+        <p class="caption detail-caption">点动作时间跳到视频里对应的画面。</p>
+        <p class="caption" id="event-empty" role="status" hidden></p>
+        <ol id="events" class="events" aria-label="画面动作"></ol>
+        <div id="event-pages" class="paging" hidden>
+          <button id="previous-events" class="secondary-button" type="button">上一组</button>
+          <span id="event-page-label" role="status" aria-live="polite"></span>
+          <button id="next-events" class="secondary-button" type="button">下一组</button>
+        </div>
+      </section>
+
+      <section id="windows-section" class="panel" aria-labelledby="windows-heading">
+        <h2 id="windows-heading">分时段测量</h2>
+        <p class="caption detail-caption">选择一个时段查看这段画面的测量值。</p>
+        <div id="window-control" class="window-control">
+          <div class="inline-field">
+            <label for="window-select">测量时段</label>
+            <select id="window-select"></select>
+          </div>
+          <div id="window-time"></div>
+        </div>
+        <p id="window-empty" class="caption" hidden>没有可展示的分时段测量。</p>
+        <dl id="window-metrics" class="measurement-list"></dl>
+      </section>
+
+      <section id="technical-section" class="panel technical-panel" aria-label="采样与时间对齐">
+        <details>
+          <summary>采样与时间对齐</summary>
+          <p class="caption detail-caption">分析时间加上偏移量，就是播放器上的时间。</p>
+          <dl id="technical-metrics" class="measurement-list"></dl>
+        </details>
       </section>
     </div>
   </main>

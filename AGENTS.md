@@ -48,7 +48,7 @@ Implemented in `src/evaluation/`:
 `src/delivery/` 负责画面和声音分析。练习流程在转写后调用这个模块来生成报告。只想测试画面时，用 [README 中的独立接口](README.md#单独分析视频画面)。
 
 - `router.py` — `POST /video/analyses` 接收视频和可选的 `presenter_ranges`。请求等待分析结束，直接返回 `VisualEvidence`。无声视频也能用。接口复用 `VIDEO_MODEL_PATH`、`MAX_UPLOAD_MB` 和 `MAX_VIDEO_SECONDS`，处理结束后删除上传的临时文件。
-- `video_demo/` — 独立的静态试用页，入口是 `/video-demo/`。选好视频后调用 `POST /video/analyses`，在同一页显示结果，也可以下载完整 JSON。
+- `video_demo/` — 独立的静态试用页，入口是 `/video-demo/`。选好视频后调用 `POST /video/analyses`。页面上方显示总览和点位覆盖率，下方可以按类别查看动作，也可以逐段查看测量值。点时间可以回看。完整结果可以下载为 JSON。
 - `schemas.py` — `DeliveryEvidence`（画面统计、声音记录和音轨偏移）与 `DeliveryReport`（`schema_version=2`）。`Evidence` 带 `id`、`start`、`end`、`metrics`；`VisualEvent` 追加 `kind`（`gaze | posture | gesture | face`）、`measurements` 和关联的 `transcript_ids`；`MotionMeasurement` 描述单个目标在一条轴上的起止值、差值、幅度与峰值速度；`PlaybackRange` 校验讲者出镜时段。
 - `video.py` — `analyze_video(path, model_path, max_seconds, presenter_ranges)`。用 MediaPipe Holistic（含面部 blendshape）按 15 Hz 抽样，帧长边缩放到 960（最多放大 2 倍），低帧率时按可用帧取样；按 2 秒窗口生成 `V…` 汇总，按持续动作生成 `E…` 事件。方向反转、关键点丢失、切镜、切换模型或离开选定范围时结束当前动作。手势阈值为 0.6 肩宽/秒、最短 0.12 秒；显著动作的最小幅度为 2°、0.08 肩宽或 0.16 blendshape 系数；16×16 缩略图平均绝对差超过 43 视为切镜。
 - `landmarks.py` — 可选补充检测器，从 `model_path` 同目录加载 `face_landmarker.task`、`pose_landmarker_heavy.task`、`hand_landmarker.task`。`VIDEO_FACE_MODE=adaptive`（默认，Holistic 缺面部数据时才调用专用模型）或 `dedicated`（每帧调用）。
