@@ -12,6 +12,7 @@ from typing import Literal
 
 from fastapi import UploadFile
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from ..audio.schemas import TaskStatus, TranscriptionResult
 from ..audio.service import AudioTooLargeError, TaskNotFoundError, TranscriptionService
@@ -19,8 +20,9 @@ from ..delivery.audio import analyze_audio
 from ..delivery.clock import audio_playback_offset
 from ..delivery.report import build_delivery_report
 from ..delivery.schemas import DeliveryEvidence, DeliveryReport, PlaybackRange
+from ..delivery.upload import VideoTooLargeError, VideoUploadError, save_video_upload
 from ..delivery.video import analyze_video
-from .media import MediaError, VIDEO_SUFFIXES, extract_audio
+from .media import MediaError, extract_audio
 from .vocabulary import Language, Term
 
 logger = logging.getLogger(__name__)
@@ -67,24 +69,13 @@ class PracticeService:
 
     async def submit(self, file: UploadFile, term: Term, language: Language,
                      presenter_ranges: list[PlaybackRange] | None = None) -> PracticeTask:
-        suffix = Path(file.filename or "").suffix.lower()
-        if suffix not in VIDEO_SUFFIXES:
-            raise MediaError("请选择 MP4、MOV、WebM、MKV 或 M4V 视频。")
         task_id = uuid.uuid4().hex
-        path = self._upload_dir / f"{task_id}{suffix}"
-        written = 0
         try:
-            with path.open("wb") as output:
-                while chunk := await file.read(1024 * 1024):
-                    written += len(chunk)
-                    if written > self._max_bytes:
-                        raise AudioTooLargeError(f"视频超过 {self._max_bytes // (1024 * 1024)} MB 上限。")
-                    output.write(chunk)
-            if not written:
-                raise MediaError("视频文件为空，请重新选择。")
-        except BaseException:
-            path.unlink(missing_ok=True)
-            raise
+            path = await run_in_threadpool(save_video_upload, file, self._upload_dir, task_id, self._max_bytes)
+        except VideoTooLargeError as exc:
+            raise AudioTooLargeError(str(exc)) from exc
+        except VideoUploadError as exc:
+            raise MediaError(str(exc)) from exc
         task = PracticeTask(
             task_id=task_id, status="queued", created_at=datetime.now(timezone.utc),
             term=term, language=language, filename=Path(file.filename or "video").name,
