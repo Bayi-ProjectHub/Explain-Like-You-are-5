@@ -55,6 +55,7 @@ app.include_router(evaluation_router)
 app.include_router(practice_router)
 app.include_router(video_router)
 app.mount("/app", StaticFiles(directory=PROJECT_ROOT / "web", html=True), name="product")
+app.mount("/video-demo", StaticFiles(directory=PROJECT_ROOT / "video_demo", html=True), name="video_demo")
 
 
 @app.get("/app", include_in_schema=False)

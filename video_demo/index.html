@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ee">
+  <title>视频画面分析 · 讲解师</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-content">
+      <a class="brand" href="/app/">讲解师</a>
+      <a class="text-link" href="/docs#/video">API 文档 <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="intro">
+      <h1>视频画面分析</h1>
+      <p>选择视频后会自动上传并分析画面。无声视频也能用。</p>
+    </div>
+
+    <div class="workspace">
+      <section class="panel video-panel" aria-labelledby="video-heading">
+        <h2 id="video-heading">视频</h2>
+        <div class="preview">
+          <div class="preview-empty" id="preview-empty">
+            <span class="play-mark" aria-hidden="true">▶</span>
+            <p id="preview-note">选择文件后可在这里预览</p>
+          </div>
+          <video id="video" aria-label="所选视频的预览" controls playsinline preload="metadata" hidden></video>
+        </div>
+        <div class="file-controls">
+          <input id="file" type="file" accept=".mp4,.mov,.webm,.mkv,.m4v" hidden>
+          <button id="choose" type="button">选择视频</button>
+          <p id="file-name">MP4 / MOV / WebM / MKV / M4V</p>
+        </div>
+      </section>
+
+      <section class="panel result-panel" aria-labelledby="result-heading">
+        <div class="section-heading">
+          <h2 id="result-heading">分析结果</h2>
+          <a class="text-link" id="download" download="video-analysis.json" hidden>下载 JSON</a>
+        </div>
+        <p id="status" class="status" role="status" aria-atomic="true">等待上传视频。</p>
+        <p id="error" class="error" role="alert" hidden></p>
+        <button id="retry" class="secondary-button" type="button" hidden>重试</button>
+
+        <div id="result" aria-busy="false" hidden>
+          <dl class="summary">
+            <div><dt>采样帧数</dt><dd id="frames"></dd></div>
+            <div><dt>动作记录</dt><dd id="event-count"></dd></div>
+          </dl>
+          <div id="observations">
+            <h3>点位覆盖率</h3>
+            <p class="caption">各类点位被识别到的采样帧比例。</p>
+            <ul id="coverage" class="coverage"></ul>
+
+            <h3>画面动作</h3>
+            <p class="caption" id="event-empty" hidden>已分析的画面里没有检测到动作。</p>
+            <ul id="events" class="events" aria-label="画面动作"></ul>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

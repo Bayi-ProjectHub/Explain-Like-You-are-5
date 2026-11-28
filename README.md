@@ -69,6 +69,8 @@ curl http://127.0.0.1:8000/practice/submissions/<task_id>
 
 用 `POST /video/analyses` 可以直接测试画面分析。只需上传一个视频。无声视频也能用，请求会等到分析结束再返回 JSON。
 
+想用浏览器试的话，启动服务后打开 [视频画面分析页](http://127.0.0.1:8000/video-demo/)。选择视频会自动上传。分析完成后，页面会显示采样帧数、点位覆盖率和动作记录。如果浏览器能播放这个文件，点击动作时间就能回看。
+
 先运行 `uv sync --locked --extra video` 安装 MediaPipe，并按上面的启动步骤下载模型。确认 `.env` 里的 `VIDEO_MODEL_PATH` 指向已下载的模型文件。
 
 ```bash
