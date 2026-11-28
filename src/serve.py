@@ -9,9 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from .audio.engine import FasterWhisperTranscriber
 from .audio.router import router as audio_router
 from .audio.service import TranscriptionService
-from .evaluation.router import router as evaluation_router
-from .config import load_settings
 from .config import PROJECT_ROOT, load_settings
+from .delivery.router import router as video_router
+from .evaluation.router import router as evaluation_router
 from .practice.router import router as practice_router
 from .practice.service import PracticeService
 from .practice.vocabulary import load_vocabulary
@@ -53,6 +53,7 @@ app = FastAPI(
 app.include_router(audio_router)
 app.include_router(evaluation_router)
 app.include_router(practice_router)
+app.include_router(video_router)
 app.mount("/app", StaticFiles(directory=PROJECT_ROOT / "web", html=True), name="product")
 
 

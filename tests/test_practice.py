@@ -264,3 +264,78 @@ def test_vision_failure_preserves_audio_and_transcript(client, tmp_path, monkeyp
     assert task["result"]["text"]
     assert task["delivery_evidence"]["visual"] is None
     assert task["delivery_evidence"]["audio"][0]["transcript_ids"] == [0]
+
+
+@pytest.fixture
+def video_model(tmp_path, monkeypatch):
+    model = tmp_path / "test.task"
+    model.touch()
+    monkeypatch.setenv("VIDEO_MODEL_PATH", str(model))
+    return model
+
+
+def test_video_analysis_accepts_silent_video(client, tmp_path, monkeypatch, video_model):
+    monkeypatch.setenv("MAX_VIDEO_SECONDS", "42")
+
+    def fake_analysis(path, model_path, max_seconds, ranges):
+        assert model_path == video_model
+        assert max_seconds == 42
+        with av.open(str(path)) as media:
+            assert media.streams.video and not media.streams.audio
+        return VisualEvidence(
+            sample_hz=15, sampled_frames=12, coverage={"face": 0.75}, windows=[],
+            selected_playback_ranges=ranges,
+        )
+
+    def unexpected_transcription(*args, **kwargs):
+        pytest.fail("Standalone video analysis called Whisper")
+
+    monkeypatch.setattr("src.delivery.router.analyze_video", fake_analysis)
+    monkeypatch.setattr("src.audio.engine.FasterWhisperTranscriber.transcribe", unexpected_transcription)
+    response = client.post(
+        "/video/analyses",
+        files={"file": ("silent.mkv", make_video(with_audio=False))},
+        data={"presenter_ranges": '[{"start":0.6,"end":1},{"start":0.1,"end":0.4}]'},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["sampled_frames"] == 12
+    assert result["coverage"] == {"face": 0.75}
+    assert result["selected_playback_ranges"] == [{"start": 0.1, "end": 0.4}, {"start": 0.6, "end": 1}]
+    assert not client.engine.calls
+    assert not list(tmp_path.glob("video-analysis-*"))
+
+
+@pytest.mark.parametrize(("filename", "case", "expected_status"), [
+    ("notes.txt", "corrupt", 415),
+    ("empty.mkv", "empty", 415),
+    ("large.mkv", "oversized", 413),
+    ("bad.mkv", "corrupt", 422),
+    ("audio.mkv", "audio_only", 422),
+    ("ranges.mkv", "overlap", 422),
+])
+def test_video_analysis_rejects_bad_input(client, tmp_path, video_model, filename, case, expected_status):
+    payload = b"corrupt"
+    ranges = "[]"
+    if case == "empty":
+        payload = b""
+    elif case == "oversized":
+        payload = b"0" * (1024 * 1024 + 1)
+    elif case == "audio_only":
+        payload = make_video(with_video=False)
+    elif case == "overlap":
+        ranges = '[{"start":0,"end":2},{"start":1,"end":3}]'
+    response = client.post(
+        "/video/analyses", files={"file": (filename, payload)}, data={"presenter_ranges": ranges},
+    )
+    assert response.status_code == expected_status
+    assert response.json()["detail"]
+    assert not list(tmp_path.glob("video-analysis-*"))
+
+
+def test_video_analysis_requires_a_model(client, tmp_path, monkeypatch):
+    monkeypatch.delenv("VIDEO_MODEL_PATH", raising=False)
+    response = client.post("/video/analyses", files={"file": ("silent.mkv", b"video")})
+    assert response.status_code == 503
+    assert "VIDEO_MODEL_PATH" in response.json()["detail"]
+    assert not list(tmp_path.glob("video-analysis-*"))

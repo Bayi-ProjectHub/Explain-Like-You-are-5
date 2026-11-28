@@ -65,6 +65,21 @@ curl http://127.0.0.1:8000/practice/submissions/<task_id>
 
 完整的请求字段、错误码和词库维护见 [PRODUCT.md](docs/PRODUCT.md)；测量含义、实测数据与已知限制见 [AGENTS.md](AGENTS.md#delivery-analysis-module)。
 
+### 单独分析视频画面
+
+用 `POST /video/analyses` 可以直接测试画面分析。只需上传一个视频。无声视频也能用，请求会等到分析结束再返回 JSON。
+
+先运行 `uv sync --locked --extra video` 安装 MediaPipe，并按上面的启动步骤下载模型。确认 `.env` 里的 `VIDEO_MODEL_PATH` 指向已下载的模型文件。
+
+```bash
+curl --fail-with-body -F 'file=@explanation.mp4' \
+  http://127.0.0.1:8000/video/analyses
+```
+
+用 `-F 'presenter_ranges=[{"start":5,"end":28}]'` 可以指定讲者出镜时段。起止时间按播放器秒数填写，最多 100 段，时段不能重叠。省略该字段就从头分析。画面从首个有时间戳的视频帧算起，最多分析 `MAX_VIDEO_SECONDS` 秒。文件大小受 `MAX_UPLOAD_MB` 限制。
+
+返回的 `sampled_frames` 是采样帧数，`coverage` 表示各类点位的覆盖率。`windows` 是分时段的测量值，`events` 记录检测到的动作。事件时间加上 `video_offset_seconds` 就是播放器时间。接口也可以在本地 [API 文档](http://127.0.0.1:8000/docs) 里试。
+
 ### 音频转写接口
 
 第一次运行需要联网下载 Whisper 模型，之后使用本地缓存

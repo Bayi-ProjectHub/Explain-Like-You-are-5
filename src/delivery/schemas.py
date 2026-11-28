@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError, computed_field, model_validator
 
 from ..audio.schemas import TranscriptionResult
 
@@ -54,6 +54,19 @@ class PlaybackRange(BaseModel):
         if self.end <= self.start:
             raise ValueError("End must be after start.")
         return self
+
+
+_playback_ranges = TypeAdapter(list[PlaybackRange])
+
+
+def parse_presenter_ranges(value: str) -> list[PlaybackRange]:
+    try:
+        ranges = sorted(_playback_ranges.validate_json(value), key=lambda item: item.start)
+    except ValidationError as exc:
+        raise ValueError("讲者时段格式不正确。") from exc
+    if len(ranges) > 100 or any(b.start < a.end for a, b in zip(ranges, ranges[1:])):
+        raise ValueError("讲者时段不得重叠，最多 100 段。")
+    return ranges
 
 
 class VisualEvidence(BaseModel):

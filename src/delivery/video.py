@@ -24,6 +24,10 @@ FACE_COEFFICIENTS = {"browInnerUp", "eyeBlinkLeft", "eyeBlinkRight", "jawOpen",
                      "mouthSmileLeft", "mouthSmileRight"}
 
 
+class VideoReadError(ValueError):
+    """The file has no usable video frames."""
+
+
 @dataclass
 class FrameSignals:
     time: float
@@ -259,13 +263,6 @@ def significant_motion(event: VisualEvent) -> bool:
 
 def analyze_video(path: Path, model_path: Path, max_seconds: int,
                   presenter_ranges: list[PlaybackRange] | None = None) -> VisualEvidence:
-    import mediapipe as mp
-
-    options = mp.tasks.vision.HolisticLandmarkerOptions(
-        base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
-        running_mode=mp.tasks.vision.RunningMode.VIDEO,
-        output_face_blendshapes=True,
-    )
     frames: list[FrameSignals] = []
     next_sample = 0.0
     last_decoded = 0.0
@@ -278,6 +275,16 @@ def analyze_video(path: Path, model_path: Path, max_seconds: int,
     previous_range_index = None
     scene_index = 0
     with ExitStack() as stack, av.open(str(path)) as media:
+        if not media.streams.video:
+            raise VideoReadError("文件中没有视频画面，请重新选择。")
+
+        import mediapipe as mp
+
+        options = mp.tasks.vision.HolisticLandmarkerOptions(
+            base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
+            running_mode=mp.tasks.vision.RunningMode.VIDEO,
+            output_face_blendshapes=True,
+        )
         model = stack.enter_context(mp.tasks.vision.HolisticLandmarker.create_from_options(options))
         fallbacks = LandmarkFallbacks(mp, stack, model_path.parent)
         wholebody = WholeBodyTracker.configured()
@@ -330,6 +337,9 @@ def analyze_video(path: Path, model_path: Path, max_seconds: int,
             previous_range_index = selected_index
             last_preview = preview
             frames.append(signals)
+
+    if video_clock_origin is None:
+        raise VideoReadError("视频里没有可读取的画面时间，请重新导出后上传。")
 
     coverage = {
         "face": sum(f.face_turn is not None for f in frames),

@@ -11,8 +11,6 @@ from pathlib import Path
 
 import av
 
-VIDEO_SUFFIXES = {".mp4", ".mov", ".webm", ".mkv", ".m4v"}
-
 
 class MediaError(ValueError):
     pass
